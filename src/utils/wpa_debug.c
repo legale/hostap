@@ -6,9 +6,12 @@
  * See README for more details.
  */
 
+
 #include "includes.h"
 
 #include "common.h"
+
+#include "../ap/hostapd.h"
 
 #ifdef CONFIG_DEBUG_SYSLOG
 #include <syslog.h>
@@ -25,7 +28,6 @@ static FILE *wpa_debug_tracing_file = NULL;
 
 #define WPAS_TRACE_PFX "wpas <%d>: "
 #endif /* CONFIG_DEBUG_LINUX_TRACING */
-
 
 int wpa_debug_level = MSG_INFO;
 int wpa_debug_show_keys = 0;
@@ -208,6 +210,28 @@ void wpa_debug_close_linux_tracing(void)
 
 #endif /* CONFIG_DEBUG_LINUX_TRACING */
 
+struct hapd_interfaces *global_ifaces = NULL;
+
+void wpa_msg_glo(int level, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+
+    // Буфер для форматированной строки
+    char buf[1024]; // Размер буфера можно изменить в зависимости от потребностей
+
+    // Форматируем строку с использованием vsnprintf
+    int len = vsnprintf(buf, sizeof(buf), fmt, ap);
+
+    // Если строка слишком длинная для буфера, можно вернуть ошибку
+    if (len < 0 || len >= sizeof(buf)) {
+        // Например, выводим ошибку, если строка не поместилась в буфер
+        fprintf(stderr, "Error formatting message\n");
+    }
+
+    va_end(ap);
+
+    hostapd_ctrl_iface_send_internal(global_ifaces->global_ctrl_sock, &global_ifaces->global_ctrl_dst, "global", level, buf, len);
+}
 
 /**
  * wpa_printf - conditional printf

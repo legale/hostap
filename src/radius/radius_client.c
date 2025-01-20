@@ -850,6 +850,7 @@ int radius_client_send(struct radius_client_data *radius,
 		       struct radius_msg *msg, RadiusType msg_type,
 		       const u8 *addr)
 {
+	wpa_msg_glo(MSG_INFO, "%s", __func__);
 	struct hostapd_radius_servers *conf = radius->conf;
 	const u8 *shared_secret;
 	size_t shared_secret_len;
@@ -1105,6 +1106,7 @@ fail:
 
 static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 {
+	wpa_msg_glo(MSG_INFO, "%s", __func__);
 	struct radius_client_data *radius = eloop_ctx;
 	struct hostapd_radius_servers *conf = radius->conf;
 	RadiusType msg_type = (uintptr_t) sock_ctx;

@@ -1168,6 +1168,7 @@ static int radius_server_request(struct radius_server_data *data,
 				 const char *from_addr, int from_port,
 				 struct radius_session *force_sess)
 {
+	wpa_msg_glo(MSG_INFO, "%s", __func__);
 	struct wpabuf *eap = NULL;
 	int res, state_included = 0;
 	u8 statebuf[4];
@@ -1475,6 +1476,7 @@ static void radius_server_receive_coa_resp(struct radius_server_data *data,
 static void radius_server_receive_auth(int sock, void *eloop_ctx,
 				       void *sock_ctx)
 {
+	wpa_msg_glo(MSG_INFO, "%s", __func__);
 	struct radius_server_data *data = eloop_ctx;
 	u8 *buf = NULL;
 	union {
