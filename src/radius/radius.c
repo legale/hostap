@@ -412,6 +412,9 @@ void radius_msg_dump(struct radius_msg *msg)
 {
 	size_t i;
 
+	wpa_msg_glo(MSG_INFO, "RADIUS message: code=%d (%s) identifier=%d length=%d",
+		   msg->hdr->code, radius_code_string(msg->hdr->code),
+		   msg->hdr->identifier, be_to_host16(msg->hdr->length));
 	wpa_printf(MSG_INFO, "RADIUS message: code=%d (%s) identifier=%d length=%d",
 		   msg->hdr->code, radius_code_string(msg->hdr->code),
 		   msg->hdr->identifier, be_to_host16(msg->hdr->length));
@@ -949,6 +952,7 @@ int radius_msg_verify_msg_auth(struct radius_msg *msg, const u8 *secret,
 
 	for (i = 0; i < msg->attr_used; i++) {
 		tmp = radius_get_attr_hdr(msg, i);
+		wpa_printf(MSG_INFO, "attr %zu: type: %u", i, tmp->type);
 		if (tmp->type == RADIUS_ATTR_MESSAGE_AUTHENTICATOR) {
 			if (attr != NULL) {
 				wpa_printf(MSG_INFO, "Multiple Message-Authenticator attributes in RADIUS message");
@@ -960,8 +964,11 @@ int radius_msg_verify_msg_auth(struct radius_msg *msg, const u8 *secret,
 
 	if (attr == NULL) {
 		wpa_printf(MSG_INFO, "No Message-Authenticator attribute found");
+		wpa_msg_glo(MSG_INFO, "No Message-Authenticator attribute found");
 		return 1;
 	}
+	wpa_printf(MSG_INFO, "Message-Authenticator attribute found");
+	wpa_msg_glo(MSG_INFO, "Message-Authenticator attribute found");
 
 	os_memcpy(orig, attr + 1, MD5_MAC_LEN);
 	os_memset(attr + 1, 0, MD5_MAC_LEN);

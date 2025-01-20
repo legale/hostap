@@ -5107,6 +5107,7 @@ static void hostapd_ctrl_iface_msg_cb(void *ctx, int level,
 
 int hostapd_ctrl_iface_init(struct hostapd_data *hapd)
 {
+wpa_printf(MSG_INFO, "hostapd_ctrl_iface_init");
 #ifdef CONFIG_CTRL_IFACE_UDP
 	int port = HOSTAPD_CTRL_IFACE_PORT;
 	char p[32] = { 0 };
@@ -6171,7 +6172,7 @@ static int hostapd_ctrl_check_event_enabled(struct wpa_ctrl_dst *dst,
 }
 
 
-static void hostapd_ctrl_iface_send_internal(int sock, struct dl_list *ctrl_dst,
+void hostapd_ctrl_iface_send_internal(int sock, struct dl_list *ctrl_dst,
 					     const char *ifname, int level,
 					     const char *buf, size_t len)
 {
