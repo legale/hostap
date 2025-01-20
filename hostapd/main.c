@@ -41,7 +41,6 @@ struct hapd_global {
 
 static struct hapd_global global;
 
-
 #ifndef CONFIG_NO_HOSTAPD_LOGGER
 static void hostapd_logger_cb(void *ctx, const u8 *addr, unsigned int module,
 			      int level, const char *txt, size_t len)
@@ -815,6 +814,7 @@ static void hostapd_global_cleanup_mld(struct hapd_interfaces *interfaces)
 int main(int argc, char *argv[])
 {
 	struct hapd_interfaces interfaces;
+	global_ifaces = &interfaces; //save interfaces to global ptr
 	int ret = 1;
 	size_t i, j;
 	int c, debug = 0, daemonize = 0;

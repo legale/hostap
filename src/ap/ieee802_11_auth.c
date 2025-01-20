@@ -56,6 +56,7 @@ struct hostapd_acl_query_data {
 #ifndef CONFIG_NO_RADIUS
 static void hostapd_acl_cache_free_entry(struct hostapd_cached_radius_acl *e)
 {
+	wpa_msg_glo(MSG_INFO, "%s", __func__);
 	os_free(e->info.identity);
 	os_free(e->info.radius_cui);
 	hostapd_free_psk_list(e->info.psk);
@@ -65,6 +66,7 @@ static void hostapd_acl_cache_free_entry(struct hostapd_cached_radius_acl *e)
 
 static void hostapd_acl_cache_free(struct hostapd_cached_radius_acl *acl_cache)
 {
+	wpa_msg_glo(MSG_INFO, "%s", __func__);
 	struct hostapd_cached_radius_acl *prev;
 
 	while (acl_cache) {
@@ -78,6 +80,8 @@ static void hostapd_acl_cache_free(struct hostapd_cached_radius_acl *acl_cache)
 static int hostapd_acl_cache_get(struct hostapd_data *hapd, const u8 *addr,
 				 struct radius_sta *out)
 {
+	wpa_msg(hapd->msg_ctx, MSG_INFO, "%s mac=" MACSTR, __func__, MAC2STR(addr));
+	// wpa_msg_glo(MSG_INFO, "%s mac=" MACSTR, __func__, MAC2STR(addr));
 	struct hostapd_cached_radius_acl *entry;
 	struct os_reltime now;
 
@@ -115,6 +119,8 @@ static void hostapd_acl_query_free(struct hostapd_acl_query_data *query)
 static int hostapd_radius_acl_query(struct hostapd_data *hapd, const u8 *addr,
 				    struct hostapd_acl_query_data *query)
 {
+	wpa_msg(hapd->msg_ctx, MSG_INFO, "%s mac=" MACSTR, __func__, MAC2STR(addr));
+	// wpa_msg_glo(MSG_INFO, "%s", __func__);
 	struct radius_msg *msg;
 	char buf[128];
 
@@ -152,6 +158,7 @@ static int hostapd_radius_acl_query(struct hostapd_data *hapd, const u8 *addr,
 
 	os_snprintf(buf, sizeof(buf), RADIUS_802_1X_ADDR_FORMAT,
 		    MAC2STR(addr));
+	wpa_msg(hapd->msg_ctx, MSG_INFO, "RADIUS_ATTR_CALLING_STATION_ID mac=" MACSTR, MAC2STR(addr));
 	if (!radius_msg_add_attr(msg, RADIUS_ATTR_CALLING_STATION_ID,
 				 (u8 *) buf, os_strlen(buf))) {
 		wpa_printf(MSG_DEBUG, "Could not add Calling-Station-Id");
@@ -251,6 +258,7 @@ int hostapd_allowed_address(struct hostapd_data *hapd, const u8 *addr,
 			    const u8 *msg, size_t len, struct radius_sta *out,
 			    int is_probe_req)
 {
+	wpa_msg_glo(MSG_INFO, "%s mac=" MACSTR, __func__, MAC2STR(addr));
 	int res;
 
 	os_memset(out, 0, sizeof(*out));

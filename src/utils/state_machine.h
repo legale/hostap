@@ -99,7 +99,10 @@ sm->data ## _ ## state = machine ## _ ## _state;
  * move the state machine to a new state.
  */
 #define SM_ENTER(machine, state) \
-sm_ ## machine ## _ ## state ## _Enter(sm, 0)
+    do { \
+        wpa_msg_glo(MSG_INFO, "%s %s", __func__, #state); \
+        sm_ ## machine ## _ ## state ## _Enter(sm, 0); \
+    } while (0)
 
 /**
  * SM_ENTER_GLOBAL - Enter a new state machine state based on global rule

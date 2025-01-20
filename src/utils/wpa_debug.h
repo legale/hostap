@@ -11,6 +11,8 @@
 
 #include "wpabuf.h"
 
+extern struct hapd_interfaces *global_ifaces;
+
 extern int wpa_debug_level;
 extern int wpa_debug_show_keys;
 extern int wpa_debug_timestamp;
@@ -85,6 +87,7 @@ void wpa_debug_stop_log(void);
  */
 void wpa_debug_print_timestamp(void);
 
+void wpa_msg_glo(int level, const char *fmt, ...);
 /**
  * wpa_printf - conditional printf
  * @level: priority level (MSG_*) of the message
