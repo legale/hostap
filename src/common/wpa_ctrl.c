@@ -106,8 +106,8 @@ struct wpa_ctrl * wpa_ctrl_open2(const char *ctrl_path,
 
 	ctrl = os_zalloc(sizeof(*ctrl));
 	if (ctrl == NULL)
-		return NULL;
 
+		return NULL;
 	ctrl->s = socket(PF_UNIX, SOCK_DGRAM, 0);
 	if (ctrl->s < 0) {
 		os_free(ctrl);

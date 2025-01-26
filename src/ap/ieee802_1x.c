@@ -744,6 +744,7 @@ void ieee802_1x_encapsulate_radius(struct hostapd_data *hapd,
 				   struct sta_info *sta,
 				   const u8 *eap, size_t len)
 {
+	wpa_msg(hapd->msg_ctx, MSG_INFO, "%s", __func__);
 	struct radius_msg *msg;
 	struct eapol_state_machine *sm = sta->eapol_sm;
 

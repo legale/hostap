@@ -100,7 +100,7 @@ sm->data ## _ ## state = machine ## _ ## _state;
  */
 #define SM_ENTER(machine, state) \
     do { \
-        wpa_msg_glo(MSG_INFO, "%s %s", __func__, #state); \
+        WPA_MSG_WIFI_INF(4, "%s", #state); \
         sm_ ## machine ## _ ## state ## _Enter(sm, 0); \
     } while (0)
 

@@ -196,21 +196,27 @@ void wpa_debug_close_linux_tracing(void)
 
 #endif /* CONFIG_DEBUG_LINUX_TRACING */
 
+int a2mac_80211x(const u8 *mac_str, u8 *mac) {
+    if (!mac_str || !mac)
+        return 1;
+
+    if (sscanf((const char *)mac_str, "%02X-%02X-%02X-%02X-%02X-%02X", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) != 6)
+        return 1;
+
+    return 0;
+}
+
 struct hapd_interfaces *global_ifaces = NULL;
 
 void wpa_msg_glo(int level, const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
 
-    // Буфер для форматированной строки
-    char buf[1024]; // Размер буфера можно изменить в зависимости от потребностей
-
-    // Форматируем строку с использованием vsnprintf
+    char buf[1024];
+	
     int len = vsnprintf(buf, sizeof(buf), fmt, ap);
 
-    // Если строка слишком длинная для буфера, можно вернуть ошибку
     if (len < 0 || len >= sizeof(buf)) {
-        // Например, выводим ошибку, если строка не поместилась в буфер
         fprintf(stderr, "Error formatting message\n");
     }
 
