@@ -9,6 +9,8 @@
 #ifndef WPA_DEBUG_H
 #define WPA_DEBUG_H
 
+#include <string.h>
+
 #include "wpabuf.h"
 
 extern struct hapd_interfaces *global_ifaces;
@@ -22,7 +24,7 @@ extern int wpa_debug_syslog;
  * use these for debugging purposes. */
 
 enum {
-	MSG_EXCESSIVE, MSG_MSGDUMP, MSG_DEBUG, MSG_INFO, MSG_WARNING, MSG_ERROR
+	MSG_EXCESSIVE, MSG_MSGDUMP, MSG_DEBUG, MSG_INFO, MSG_WARNING, MSG_ERROR, MSG_WIFIMON
 };
 
 #ifdef CONFIG_NO_STDOUT_DEBUG
@@ -87,6 +89,7 @@ void wpa_debug_stop_log(void);
  */
 void wpa_debug_print_timestamp(void);
 
+int a2mac_80211x(const u8 *mac_str, u8 *mac);
 void wpa_msg_glo(int level, const char *fmt, ...);
 /**
  * wpa_printf - conditional printf
@@ -395,5 +398,20 @@ static inline void wpa_debug_close_linux_tracing(void)
 
 const char * debug_level_str(int level);
 int str_to_debug_level(const char *s);
+
+#define __FILENAME__ (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
+
+// Макрос для информационных сообщений (status=1)
+#define WPA_MSG_WIFI_INF(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=1 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
+// Макрос для сообщений об ошибках (status=2)
+#define WPA_MSG_WIFI_ERR(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=2 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
+// Макрос для сообщений об успешных операциях (status=0)
+#define WPA_MSG_WIFI_OK(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=0 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
 
 #endif /* WPA_DEBUG_H */

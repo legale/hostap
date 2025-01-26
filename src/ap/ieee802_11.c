@@ -2686,7 +2686,7 @@ static int ieee802_11_allowed_address(struct hostapd_data *hapd, const u8 *addr,
 				      const u8 *msg, size_t len,
 				      struct radius_sta *info)
 {
-	wpa_msg_glo(MSG_INFO, "%s mac=" MACSTR, __func__, MAC2STR(addr));
+	WPA_MSG_WIFI_INF(2, "%s mac=" MACSTR, __func__, MAC2STR(addr));
 	int res;
 
 	res = hostapd_allowed_address(hapd, addr, msg, len, info, 0);
@@ -3263,7 +3263,7 @@ static void handle_auth(struct hostapd_data *hapd,
 			const struct ieee80211_mgmt *mgmt, size_t len,
 			int rssi, int from_queue)
 {
-	wpa_msg_glo(MSG_INFO, "%s sa=" MACSTR "da=" MACSTR "bssid=" MACSTR, __func__, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
+	WPA_MSG_WIFI_INF(2, "%s sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, __func__, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 
 	u16 auth_alg, auth_transaction, status_code;
 	u16 resp = WLAN_STATUS_SUCCESS;
@@ -6844,6 +6844,7 @@ static void notify_mgmt_frame(struct hostapd_data *hapd, const u8 *buf,
 int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		    struct hostapd_frame_info *fi)
 {
+	// WPA_MSG_WIFI_INF(0, "");
 	struct ieee80211_mgmt *mgmt;
 	u16 fc, stype;
 	int ret = 0;
@@ -6903,8 +6904,8 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	      ether_addr_equal(hapd->mld->mld_addr, mgmt->bssid)) &&
 #endif /* CONFIG_IEEE80211BE */
 	    !ether_addr_equal(mgmt->bssid, hapd->own_addr)) {
-		wpa_printf(MSG_INFO, "MGMT: BSSID=" MACSTR " not our address",
-			   MAC2STR(mgmt->bssid));
+		wpa_printf(MSG_INFO, "MGMT: BSSID=" MACSTR " not our address", MAC2STR(mgmt->bssid));
+		WPA_MSG_WIFI_INF(2, "MGMT: BSSID=" MACSTR " not our address", MAC2STR(mgmt->bssid));
 		return 0;
 	}
 
@@ -7506,14 +7507,17 @@ void ieee802_11_mgmt_cb(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
 		wpa_printf(MSG_DEBUG, "mgmt::auth cb");
+		WPA_MSG_WIFI_INF(2, "mgmt::auth cb: stype=%d ok=%d", stype, ok);
 		handle_auth_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_ASSOC_RESP:
 		wpa_printf(MSG_DEBUG, "mgmt::assoc_resp cb");
+		WPA_MSG_WIFI_INF(5, "mgmt::assoc_resp cb ok=%d", ok);
 		handle_assoc_cb(hapd, mgmt, len, 0, ok);
 		break;
 	case WLAN_FC_STYPE_REASSOC_RESP:
 		wpa_printf(MSG_DEBUG, "mgmt::reassoc_resp cb");
+		WPA_MSG_WIFI_INF(5, "mgmt::reassoc_resp cb ok=%d", ok);
 		handle_assoc_cb(hapd, mgmt, len, 1, ok);
 		break;
 	case WLAN_FC_STYPE_PROBE_RESP:
