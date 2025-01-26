@@ -847,7 +847,7 @@ int radius_client_send(struct radius_client_data *radius,
 		       struct radius_msg *msg, RadiusType msg_type,
 		       const u8 *addr)
 {
-	WPA_MSG_WIFI_INF(3, "radius_type=%d sa=" MACSTR, msg_type, MAC2STR(addr));
+	WPA_MSG_WIFI_INF(2, "radius_type=%d sa=" MACSTR, msg_type, MAC2STR(addr));
 	struct hostapd_radius_servers *conf = radius->conf;
 	const u8 *shared_secret;
 	size_t shared_secret_len;
@@ -1139,7 +1139,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	msghdr.msg_flags = 0;
 	len = recvmsg(sock, &msghdr, MSG_DONTWAIT);
 	if (len < 0) {
-		WPA_MSG_WIFI_INF(3, "recvmsg[RADIUS]: %d %s", errno, strerror(errno));
+		WPA_MSG_WIFI_ERR(3, "recvmsg[RADIUS]: %d %s", errno, strerror(errno));
 		wpa_printf(MSG_INFO, "recvmsg[RADIUS]: %s", strerror(errno));
 		return;
 	}
@@ -1189,12 +1189,26 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 		wpabuf_free(out);
 	}
 #endif /* CONFIG_RADIUS_TLS */
+	char ipbuf[INET6_ADDRSTRLEN] = {0};
+	void *in_addr = NULL;
+	if(rconf->addr.af == AF_INET){
+		in_addr = &rconf->addr.u.v4;
+		inet_ntop(rconf->addr.af, in_addr, ipbuf, INET6_ADDRSTRLEN);
+	}
+#ifdef CONFIG_IPV6
+	 else if (rconf->addr.af == AF_INET6){
+		in_addr = &rconf->addr.u.v6;
+		inet_ntop(rconf->addr.af, in_addr, ipbuf, INET6_ADDRSTRLEN);
+	}
+#endif
 
+	WPA_MSG_WIFI_INF(3, "recv=%d from radius_server=%s", len, ipbuf);
 	hostapd_logger(radius->ctx, NULL, HOSTAPD_MODULE_RADIUS,
 		       HOSTAPD_LEVEL_DEBUG, "Received %d bytes from RADIUS "
 		       "server", len);
 
 	if (msghdr.msg_flags & MSG_TRUNC) {
+
 		wpa_printf(MSG_INFO, "RADIUS: Possibly too long UDP frame for our buffer - dropping it");
 		return;
 	}
@@ -1288,7 +1302,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 		}
 		// radius_msg_dump(req->msg);
 	}
-	WPA_MSG_WIFI_INF(3, "radius_type=%d reply code=%u req->addr=" MACSTR " len=%zu val=%s", msg_type, hdr->code, MAC2STR(req->addr), len_attr, buf_macstr);
+	WPA_MSG_WIFI_INF(3, "radius_type=%d reply code=%u sa=" MACSTR " len=%zu val=%s", msg_type, hdr->code, MAC2STR(req->addr), len_attr, buf_macstr);
 	
 	/* Remove ACKed RADIUS packet from retransmit list */
 	if (prev_req)
