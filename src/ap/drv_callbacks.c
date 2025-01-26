@@ -1474,12 +1474,10 @@ void hostapd_event_connect_failed_reason(struct hostapd_data *hapd,
 {
 	switch (reason_code) {
 	case MAX_CLIENT_REACHED:
-		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_REJECTED_MAX_STA MACSTR,
-			MAC2STR(addr));
+		WPA_MSG_WIFI_ERR(5, AP_REJECTED_MAX_STA " sa=" MACSTR, MAC2STR(addr));
 		break;
 	case BLOCKED_CLIENT:
-		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_REJECTED_BLOCKED_STA MACSTR,
-			MAC2STR(addr));
+		WPA_MSG_WIFI_ERR(5, AP_REJECTED_BLOCKED_STA " sa=" MACSTR, MAC2STR(addr));
 		break;
 	}
 }

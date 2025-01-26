@@ -1751,6 +1751,8 @@ bool ap_sta_set_authorized_flag(struct hostapd_data *hapd, struct sta_info *sta,
 void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 				 struct sta_info *sta, int authorized)
 {
+	WPA_MSG_WIFI_INF(5, "%s authorized=%d sa=" MACSTR, __func__, authorized, MAC2STR(sta->addr));
+
 	const u8 *dev_addr = NULL;
 	char buf[100];
 #ifdef CONFIG_P2P
