@@ -393,4 +393,8 @@ int str_to_debug_level(const char *s);
 #define WPA_MSG_WIFI_WARN(stage, fmt, ...) \
     wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
 
+// Макрос для сообщений с предупреждением (status=3)
+#define WPA_MSG_WIFI_DEBUG(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
 #endif /* WPA_DEBUG_H */
