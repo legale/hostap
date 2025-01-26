@@ -7677,36 +7677,34 @@ void ieee802_11_mgmt_cb(struct hostapd_data *hapd, const u8 *buf, size_t len,
 
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		wpa_printf(MSG_DEBUG, "mgmt::auth cb");
-		WPA_MSG_WIFI_INF(2, "mgmt::auth cb: stype=%d ok=%d", stype, ok);
+		WPA_MSG_WIFI_INF(2, "mgmt::auth stype=%d ok=%d sa=" MACSTR " da=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 		handle_auth_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_ASSOC_RESP:
-		wpa_printf(MSG_DEBUG, "mgmt::assoc_resp cb");
-		WPA_MSG_WIFI_INF(5, "mgmt::assoc_resp cb ok=%d", ok);
+		WPA_MSG_WIFI_INF(6, "mgmt::assoc_resp ok=%d sa=" MACSTR " da=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 		handle_assoc_cb(hapd, mgmt, len, 0, ok);
 		break;
 	case WLAN_FC_STYPE_REASSOC_RESP:
-		wpa_printf(MSG_DEBUG, "mgmt::reassoc_resp cb");
-		WPA_MSG_WIFI_INF(5, "mgmt::reassoc_resp cb ok=%d", ok);
+		WPA_MSG_WIFI_INF(6, "mgmt::reassoc_resp ok=%d sa=" MACSTR " da=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 		handle_assoc_cb(hapd, mgmt, len, 1, ok);
 		break;
 	case WLAN_FC_STYPE_PROBE_RESP:
-		wpa_printf(MSG_EXCESSIVE, "mgmt::proberesp cb ok=%d", ok);
+		WPA_MSG_WIFI_DEBUG(0, "mgmt::proberesp ok=%d sa=" MACSTR " da=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 		break;
 	case WLAN_FC_STYPE_DEAUTH:
-		wpa_printf(MSG_DEBUG, "mgmt::deauth cb");
+		WPA_MSG_WIFI_INF(7, "mgmt::deauth ok=%d sa=" MACSTR " da=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 		handle_deauth_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_DISASSOC:
-		wpa_printf(MSG_DEBUG, "mgmt::disassoc cb");
+		WPA_MSG_WIFI_INF(7, "mgmt::disassoc ok=%d sa=" MACSTR " da=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 		handle_disassoc_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_ACTION:
-		wpa_printf(MSG_DEBUG, "mgmt::action cb ok=%d", ok);
+		WPA_MSG_WIFI_INF(0, "mgmt::action cb ok=%d sa=" MACSTR " da=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 		handle_action_cb(hapd, mgmt, len, ok);
 		break;
 	default:
+		WPA_MSG_WIFI_INF(0, "unknown mgmt cb frame subtype %d", stype);
 		wpa_printf(MSG_INFO, "unknown mgmt cb frame subtype %d", stype);
 		break;
 	}
