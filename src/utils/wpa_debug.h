@@ -401,6 +401,11 @@ int str_to_debug_level(const char *s);
 
 #define __FILENAME__ (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
 
+
+// Макрос для сообщений об успешных операциях (status=0)
+#define WPA_MSG_WIFI_OK(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=0 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
 // Макрос для информационных сообщений (status=1)
 #define WPA_MSG_WIFI_INF(stage, fmt, ...) \
     wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=1 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
@@ -409,9 +414,8 @@ int str_to_debug_level(const char *s);
 #define WPA_MSG_WIFI_ERR(stage, fmt, ...) \
     wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=2 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
 
-// Макрос для сообщений об успешных операциях (status=0)
-#define WPA_MSG_WIFI_OK(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=0 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
-
+// Макрос для сообщений с предупреждением (status=3)
+#define WPA_MSG_WIFI_WARN(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
 
 #endif /* WPA_DEBUG_H */
