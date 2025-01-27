@@ -320,11 +320,14 @@ static int hostapd_wpa_auth_mic_failure_report(void *ctx, const u8 *addr)
 {
 	struct hostapd_data *hapd = ctx;
 	return michael_mic_failure(hapd, addr, 0);
+	WPA_MSG_WIFI_ERR(4, "message itegrity check failed sa=" MACSTR, MAC2STR(addr));
 }
 
 
 static void hostapd_wpa_auth_psk_failure_report(void *ctx, const u8 *addr)
 {
+	WPA_MSG_WIFI_ERR(4, AP_STA_POSSIBLE_PSK_MISMATCH " sa=" MACSTR, MAC2STR(addr));
+	
 	struct hostapd_data *hapd = ctx;
 	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POSSIBLE_PSK_MISMATCH MACSTR,
 		MAC2STR(addr));

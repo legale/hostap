@@ -1500,7 +1500,11 @@ bool ap_sta_set_authorized_flag(struct hostapd_data *hapd, struct sta_info *sta,
 void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 				 struct sta_info *sta, int authorized)
 {
-	WPA_MSG_WIFI_INF(5, "%s authorized=%d sa=" MACSTR, __func__, authorized, MAC2STR(sta->addr));
+	if(authorized){
+		WPA_MSG_WIFI_OK(5, "%s authorized=%d sa=" MACSTR, __func__, authorized, MAC2STR(sta->addr));
+	} else {
+		WPA_MSG_WIFI_OK(7, "%s authorized=%d sa=" MACSTR, __func__, authorized, MAC2STR(sta->addr));
+	}
 
 	const u8 *dev_addr = NULL;
 	char buf[100];
