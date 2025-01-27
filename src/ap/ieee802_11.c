@@ -2354,7 +2354,7 @@ static int ieee802_11_allowed_address(struct hostapd_data *hapd, const u8 *addr,
 				      const u8 *msg, size_t len,
 				      struct radius_sta *info)
 {
-	WPA_MSG_WIFI_INF(1, "%s mac=" MACSTR, __func__, MAC2STR(addr));
+	WPA_MSG_WIFI_INF(1, "sa=" MACSTR, MAC2STR(addr));
 	int res;
 
 	res = hostapd_allowed_address(hapd, addr, msg, len, info, 0);
