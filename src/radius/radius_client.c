@@ -851,9 +851,9 @@ int radius_client_send(struct radius_client_data *radius,
 		       const u8 *addr)
 {
 	if(addr){
-		WPA_MSG_WIFI_INF(3, "radius_type=%d sa=" MACSTR, msg_type, MAC2STR(addr));
+		WPA_MSG_WIFI_INF(2, "radius_type=%d sa=" MACSTR, msg_type, MAC2STR(addr));
 	} else {
-		WPA_MSG_WIFI_INF(3, "radius_type=%d sa=00:00:00:00:00:00", msg_type);
+		// WPA_MSG_WIFI_INF(3, "radius_type=%d sa=00:00:00:00:00:00", msg_type);
 	}
 
 	struct hostapd_radius_servers *conf = radius->conf;
@@ -867,6 +867,16 @@ int radius_client_send(struct radius_client_data *radius,
 	struct tls_connection *conn = NULL;
 	bool acct = false;
 #endif /* CONFIG_RADIUS_TLS */
+	if (msg_type == RADIUS_ACCT || msg_type == RADIUS_ACCT_INTERIM) {
+	if (conf->acct_server == NULL || radius->acct_sock < 0 || conf->acct_server->shared_secret == NULL){
+		WPA_MSG_WIFI_ERR(2, "RADIUS acct server is not configured");
+	}
+	} else {
+		if (conf->auth_server == NULL || radius->auth_sock < 0 ||
+			conf->auth_server->shared_secret == NULL) {
+		WPA_MSG_WIFI_ERR(2, "RADIUS auth server is not configured");
+		}
+	}
 
 	if (msg_type == RADIUS_ACCT || msg_type == RADIUS_ACCT_INTERIM) {
 #ifdef CONFIG_RADIUS_TLS
@@ -959,6 +969,23 @@ int radius_client_send(struct radius_client_data *radius,
 		buf = out;
 	}
 #endif /* CONFIG_RADIUS_TLS */
+	char abuf[50];
+	if(msg_type == RADIUS_AUTH && conf->auth_server && addr){
+		WPA_MSG_WIFI_INF(2, "auth radius_type=%d send=%zu server=%s:%d sa=" MACSTR,
+			msg_type, wpabuf_len(buf),
+			hostapd_ip_txt(&conf->auth_server->addr, abuf, sizeof(abuf)),
+			conf->auth_server->port,
+			MAC2STR(addr));
+	} else if (conf->acct_server && addr) {
+		WPA_MSG_WIFI_INF(2, "acct radius_type=%d send=%zu server=%s:%d sa=" MACSTR,
+			msg_type, wpabuf_len(buf),
+			hostapd_ip_txt(&conf->acct_server->addr, abuf, sizeof(abuf)),
+			conf->acct_server->port,
+			MAC2STR(addr));
+	} else {
+		WPA_MSG_WIFI_INF(2, "RADIUS: Send %zu bytes to the server", wpabuf_len(buf));
+	}
+
 	wpa_printf(MSG_DEBUG, "RADIUS: Send %zu bytes to the server",
 		   wpabuf_len(buf));
 	res = send(s, wpabuf_head(buf), wpabuf_len(buf), 0);
