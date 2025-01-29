@@ -1141,6 +1141,8 @@ legacy:
 void hostapd_event_sta_low_ack(struct hostapd_data *hapd, const u8 *addr)
 {
 	struct sta_info *sta = ap_get_sta(hapd, addr);
+	WPA_MSG_WIFI_ERR(0, "sa=" MACSTR, MAC2STR(addr));
+
 #ifdef CONFIG_IEEE80211BE
 	struct hostapd_data *orig_hapd = hapd;
 
@@ -1171,6 +1173,8 @@ void hostapd_event_sta_opmode_changed(struct hostapd_data *hapd, const u8 *addr,
 				      enum smps_mode smps_mode,
 				      enum chan_width chan_width, u8 rx_nss)
 {
+	WPA_MSG_WIFI_INF(0, "sa=" MACSTR, MAC2STR(addr));
+
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 	const char *txt;
 
@@ -1474,10 +1478,10 @@ void hostapd_event_connect_failed_reason(struct hostapd_data *hapd,
 {
 	switch (reason_code) {
 	case MAX_CLIENT_REACHED:
-		WPA_MSG_WIFI_ERR(5, AP_REJECTED_MAX_STA " sa=" MACSTR, MAC2STR(addr));
+		WPA_MSG_WIFI_ERR(0, AP_REJECTED_MAX_STA " sa=" MACSTR, MAC2STR(addr));
 		break;
 	case BLOCKED_CLIENT:
-		WPA_MSG_WIFI_ERR(5, AP_REJECTED_BLOCKED_STA " sa=" MACSTR, MAC2STR(addr));
+		WPA_MSG_WIFI_ERR(0, AP_REJECTED_BLOCKED_STA " sa=" MACSTR, MAC2STR(addr));
 		break;
 	}
 }
@@ -2079,6 +2083,7 @@ static void hostapd_mgmt_tx_cb(struct hostapd_data *hapd, const u8 *buf,
 
 static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr)
 {
+	WPA_MSG_WIFI_INF(0, "sa=" MACSTR, MAC2STR(addr));
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 
 	if (sta)
