@@ -377,6 +377,19 @@ int str_to_debug_level(const char *s);
 #define __FILENAME__ (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
 
 
+typedef enum wifi_stage {
+	S_UNK, //unknown stage
+	S_AUTH, //incoming mgmt::auth frame
+	S_AUTH_HANDLE, //mgmt::auth frame handle
+	S_ASSOC_REQ, //assoc req stage
+	S_ASSOC_RESP, //assoc resp stage
+	S_RADIUS_REQ, //radius req stage
+	S_RADIUS_RESP, //radius resp stage
+	S_HANDSHAKE, //handshake stage
+	S_CONNECTED, //connected stage
+	S_DEAUTH, //deauth disassoc stage
+} wifi_stage_t;
+
 // Макрос для сообщений об успешных операциях (status=0)
 #define WPA_MSG_WIFI_OK(stage, fmt, ...) \
     wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=0 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)

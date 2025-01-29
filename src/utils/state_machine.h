@@ -46,8 +46,6 @@ static void sm_ ## machine ## _ ## state ## _Enter(STATE_MACHINE_DATA *sm, \
 #define SM_ENTRY(machine, state) \
 if (!global || sm->machine ## _state != machine ## _ ## state) { \
 	sm->changed = true; \
-	WPA_MSG_WIFI_INF(4, STATE_MACHINE_DEBUG_PREFIX ": " #machine \
-		   " entering state " #state); \
 } \
 sm->machine ## _state = machine ## _ ## state;
 
@@ -65,8 +63,6 @@ sm->machine ## _state = machine ## _ ## state;
 #define SM_ENTRY_M(machine, _state, data) \
 if (!global || sm->data ## _ ## state != machine ## _ ## _state) { \
 	sm->changed = true; \
-	WPA_MSG_WIFI_INF(4, STATE_MACHINE_DEBUG_PREFIX ": " \
-		   #machine " entering state " #_state); \
 } \
 sm->data ## _ ## state = machine ## _ ## _state;
 
@@ -83,7 +79,7 @@ sm->data ## _ ## state = machine ## _ ## _state;
 #define SM_ENTRY_MA(machine, _state, data) \
 if (!global || sm->data ## _ ## state != machine ## _ ## _state) { \
 	sm->changed = true; \
-	WPA_MSG_WIFI_INF(4, STATE_MACHINE_DEBUG_PREFIX ": sa=" MACSTR " " \
+	WPA_MSG_WIFI_INF(S_HANDSHAKE, STATE_MACHINE_DEBUG_PREFIX ": sa=" MACSTR " " \
 		   #machine " entering state " #_state, \
 		   MAC2STR(STATE_MACHINE_ADDR)); \
 } \
@@ -100,7 +96,6 @@ sm->data ## _ ## state = machine ## _ ## _state;
  */
 #define SM_ENTER(machine, state) \
 do { \
-    WPA_MSG_WIFI_INF(4, "%s", #machine "_" #state); \
     sm_ ## machine ## _ ## state ## _Enter(sm, 0); \
 } while (0)
 
