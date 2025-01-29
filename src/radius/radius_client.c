@@ -851,9 +851,9 @@ int radius_client_send(struct radius_client_data *radius,
 		       const u8 *addr)
 {
 	if(addr){
-		WPA_MSG_WIFI_INF(2, "radius_type=%d sa=" MACSTR, msg_type, MAC2STR(addr));
+		WPA_MSG_WIFI_INF(S_RADIUS_REQ, "radius_type=%d sa=" MACSTR, msg_type, MAC2STR(addr));
 	} else {
-		// WPA_MSG_WIFI_INF(3, "radius_type=%d sa=00:00:00:00:00:00", msg_type);
+		// WPA_MSG_WIFI_INF(S_RADIUS_REQ, "radius_type=%d sa=00:00:00:00:00:00", msg_type);
 	}
 
 	struct hostapd_radius_servers *conf = radius->conf;
@@ -869,12 +869,12 @@ int radius_client_send(struct radius_client_data *radius,
 #endif /* CONFIG_RADIUS_TLS */
 	if (msg_type == RADIUS_ACCT || msg_type == RADIUS_ACCT_INTERIM) {
 	if (conf->acct_server == NULL || radius->acct_sock < 0 || conf->acct_server->shared_secret == NULL){
-		WPA_MSG_WIFI_ERR(2, "RADIUS acct server is not configured");
+		WPA_MSG_WIFI_ERR(S_RADIUS_REQ, "RADIUS acct server is not configured");
 	}
 	} else {
 		if (conf->auth_server == NULL || radius->auth_sock < 0 ||
 			conf->auth_server->shared_secret == NULL) {
-		WPA_MSG_WIFI_ERR(2, "RADIUS auth server is not configured");
+		WPA_MSG_WIFI_ERR(S_RADIUS_REQ, "RADIUS auth server is not configured");
 		}
 	}
 
@@ -971,19 +971,19 @@ int radius_client_send(struct radius_client_data *radius,
 #endif /* CONFIG_RADIUS_TLS */
 	char abuf[50];
 	if(msg_type == RADIUS_AUTH && conf->auth_server && addr){
-		WPA_MSG_WIFI_INF(2, "auth radius_type=%d send=%zu server=%s:%d sa=" MACSTR,
+		WPA_MSG_WIFI_INF(S_RADIUS_REQ, "auth radius_type=%d send=%zu server=%s:%d sa=" MACSTR,
 			msg_type, wpabuf_len(buf),
 			hostapd_ip_txt(&conf->auth_server->addr, abuf, sizeof(abuf)),
 			conf->auth_server->port,
 			MAC2STR(addr));
 	} else if (conf->acct_server && addr) {
-		WPA_MSG_WIFI_INF(2, "acct radius_type=%d send=%zu server=%s:%d sa=" MACSTR,
+		WPA_MSG_WIFI_INF(S_RADIUS_REQ, "acct radius_type=%d send=%zu server=%s:%d sa=" MACSTR,
 			msg_type, wpabuf_len(buf),
 			hostapd_ip_txt(&conf->acct_server->addr, abuf, sizeof(abuf)),
 			conf->acct_server->port,
 			MAC2STR(addr));
 	} else {
-		WPA_MSG_WIFI_INF(2, "RADIUS: Send %zu bytes to the server", wpabuf_len(buf));
+		WPA_MSG_WIFI_INF(S_RADIUS_REQ, "RADIUS: Send %zu bytes to the server", wpabuf_len(buf));
 	}
 
 	wpa_printf(MSG_DEBUG, "RADIUS: Send %zu bytes to the server",
@@ -1138,7 +1138,7 @@ fail:
 
 static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 {
-	WPA_MSG_WIFI_INF(3, "");
+	WPA_MSG_WIFI_INF(0, "");
 	struct radius_client_data *radius = eloop_ctx;
 	struct hostapd_radius_servers *conf = radius->conf;
 	RadiusType msg_type = (uintptr_t) sock_ctx;
@@ -1188,7 +1188,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	msghdr.msg_flags = 0;
 	len = recvmsg(sock, &msghdr, MSG_DONTWAIT);
 	if (len < 0) {
-		WPA_MSG_WIFI_INF(3, "recvmsg[RADIUS]: %d %s", errno, strerror(errno));
+		WPA_MSG_WIFI_INF(S_RADIUS_RESP, "recvmsg[RADIUS]: %d %s", errno, strerror(errno));
 		wpa_printf(MSG_INFO, "recvmsg[RADIUS]: %s", strerror(errno));
 		return;
 	}
@@ -1291,7 +1291,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	}
 
 	if (req == NULL) {
-		WPA_MSG_WIFI_ERR(3, "dropped packed no matching RADIUS request found type=%d id=%d", msg_type, hdr->identifier);
+		WPA_MSG_WIFI_ERR(S_RADIUS_RESP, "dropped packed no matching RADIUS request found type=%d id=%d", msg_type, hdr->identifier);
 		hostapd_logger(radius->ctx, NULL, HOSTAPD_MODULE_RADIUS,
 			       HOSTAPD_LEVEL_DEBUG,
 			       "No matching RADIUS request found (type=%d "
@@ -1300,7 +1300,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 		goto fail;
 	}
 
-	WPA_MSG_WIFI_INF(3, "found corresponding RADIUS req found type=%d id=%d sa=" MACSTR, MAC2STR(req->addr), msg_type, hdr->identifier);
+	WPA_MSG_WIFI_INF(S_RADIUS_RESP, "found corresponding RADIUS req type=%d id=%d sa=" MACSTR, MAC2STR(req->addr), msg_type, hdr->identifier);
 	
 
 	os_get_reltime(&now);
@@ -1320,17 +1320,18 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 
 	int ret = radius_msg_get_attr_ptr(req->msg, RADIUS_ATTR_CALLING_STATION_ID,
 								&attr_val_ptr, &len_attr, NULL);
-	WPA_MSG_WIFI_INF(3, "radius_msg_get_attr_ptr 31 len: %zu", len_attr);
+	WPA_MSG_WIFI_INF(S_RADIUS_RESP, "radius_msg_get_attr_ptr 31 len: %zu", len_attr);
 
 	if (ret == 0) {
 		// parse string as 80211x mac address format string and store mac to
 		// byte array
 		if (a2mac_80211x(attr_val_ptr, buf_mac)) {
-			WPA_MSG_WIFI_ERR(3,
+			WPA_MSG_WIFI_ERR(S_RADIUS_RESP,
 					 "unable to parse attr as 80211x mac string");
 
 			if (len_attr > sizeof(buf_macstr)) {
-				WPA_MSG_WIFI_ERR(3, "attr len: %zu > %zu",
+				WPA_MSG_WIFI_ERR(S_RADIUS_RESP,
+						 "attr len: %zu > %zu",
 						 sizeof(buf_macstr));
 			}
 			memcpy(buf_macstr, attr_val_ptr, len_attr);
@@ -1341,10 +1342,11 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 		}
 		// radius_msg_dump(req->msg);
 	}
-	WPA_MSG_WIFI_INF(3,
-			 "radius_type=%d reply code=%u sa=" MACSTR " len=%zu val=%s",
+	WPA_MSG_WIFI_INF(S_RADIUS_RESP,
+			 "radius_type=%d reply code=%u req->addr=" MACSTR
+			 " len=%zu val=%s mac=" MACSTR,
 			 msg_type, hdr->code, MAC2STR(req->addr), len_attr,
-			 buf_macstr);
+			 buf_macstr, MAC2STR(req->addr));
 	for (i = 0; i < num_handlers; i++) {
 		RadiusRxResult res;
 		res = handlers[i].handler(msg, req->msg, req->shared_secret,
@@ -1636,7 +1638,7 @@ radius_change_server(struct radius_client_data *radius,
 		return -1;
 #endif /* CONFIG_RADIUS_TLS */
 	}
-	WPA_MSG_WIFI_INF(2, "%s server %s:%d",
+	WPA_MSG_WIFI_INF(S_RADIUS_REQ, "%s server %s:%d",
 		       auth ? "auth" : "acct",
 		       hostapd_ip_txt(&nserv->addr, abuf, sizeof(abuf)),
 		       nserv->port);

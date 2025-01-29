@@ -2686,7 +2686,7 @@ static int ieee802_11_allowed_address(struct hostapd_data *hapd, const u8 *addr,
 				      const u8 *msg, size_t len,
 				      struct radius_sta *info)
 {
-	WPA_MSG_WIFI_INF(1, "sa=" MACSTR, MAC2STR(addr));
+	WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "sa=" MACSTR, MAC2STR(addr));
 	int res;
 
 	res = hostapd_allowed_address(hapd, addr, msg, len, info, 0);
@@ -3263,7 +3263,7 @@ static void handle_auth(struct hostapd_data *hapd,
 			const struct ieee80211_mgmt *mgmt, size_t len,
 			int rssi, int from_queue)
 {
-	WPA_MSG_WIFI_INF(1, "%s sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, __func__, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
+	WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 
 	u16 auth_alg, auth_transaction, status_code;
 	u16 resp = WLAN_STATUS_SUCCESS;
@@ -6893,18 +6893,18 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	stype = WLAN_FC_GET_STYPE(fc);
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WPA_MSG_WIFI_INF(1, "mgmt::auth sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_AUTH, "frame=mgmt::auth sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	case WLAN_FC_STYPE_ASSOC_REQ:
-		WPA_MSG_WIFI_INF(5, "mgmt::assoc_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	case WLAN_FC_STYPE_ASSOC_RESP:
 		break;
 	case WLAN_FC_STYPE_REASSOC_REQ:
-		WPA_MSG_WIFI_INF(5, "mgmt::reassoc_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_ASSOC_REQ, "frame=mgmt::reassoc_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	case WLAN_FC_STYPE_REASSOC_RESP:
-		WPA_MSG_WIFI_INF(5, "mgmt::reassoc_resp sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_ASSOC_RESP, "frame=mgmt::reassoc_resp sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	case WLAN_FC_STYPE_PROBE_REQ:
 		// WPA_MSG_WIFI_DEBUG(0, "mgmt::probe_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
@@ -6915,19 +6915,19 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		// WPA_MSG_WIFI_INF(0, "mgmt::beacon sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	case WLAN_FC_STYPE_ATIM:
-		WPA_MSG_WIFI_INF(0, "mgmt::atim sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_UNK, "frame=mgmt::atim sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	case WLAN_FC_STYPE_DEAUTH:
-		WPA_MSG_WIFI_INF(7, "mgmt::deauth sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_DEAUTH, "frame=mgmt::deauth sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	case WLAN_FC_STYPE_ACTION:
-		WPA_MSG_WIFI_INF(0, "mgmt::action sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_UNK, "frame=mgmt::action sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	case WLAN_FC_STYPE_ACTION_NO_ACK:
-		WPA_MSG_WIFI_INF(0, "mgmt::action_no_ack sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_UNK, "frame=mgmt::action_no_ack sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	default:
-		WPA_MSG_WIFI_WARN(0, "mgmt frame unknown fc subtype: %d", stype);
+		WPA_MSG_WIFI_WARN(S_UNK, "frame=mgmt unknown fc subtype: %d", stype);
 		return ret;
 	}
 
@@ -6967,7 +6967,7 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 #endif /* CONFIG_IEEE80211BE */
 	    !ether_addr_equal(mgmt->bssid, hapd->own_addr)) {
 		wpa_printf(MSG_INFO, "MGMT: BSSID=" MACSTR " not our address", MAC2STR(mgmt->bssid));
-		WPA_MSG_WIFI_INF(2, "MGMT: BSSID=" MACSTR " not our address", MAC2STR(mgmt->bssid));
+		WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "MGMT: BSSID=" MACSTR " not our address", MAC2STR(mgmt->bssid));
 		return 0;
 	}
 
@@ -7009,25 +7009,21 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
 		wpa_printf(MSG_DEBUG, "mgmt::auth");
-		wpa_msg(hapd->msg_ctx, MSG_INFO, "%s mgmt::auth sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, __func__, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 		handle_auth(hapd, mgmt, len, ssi_signal, 0);
 		ret = 1;
 		break;
 	case WLAN_FC_STYPE_ASSOC_REQ:
 		wpa_printf(MSG_DEBUG, "mgmt::assoc_req");
-		wpa_msg(hapd->msg_ctx, MSG_INFO, "%s mgmt::assoc_req sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, __func__, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 		handle_assoc(hapd, mgmt, len, 0, ssi_signal);
 		ret = 1;
 		break;
 	case WLAN_FC_STYPE_REASSOC_REQ:
 		wpa_printf(MSG_DEBUG, "mgmt::reassoc_req");
-		wpa_msg(hapd->msg_ctx, MSG_INFO, "%s mgmt::reassoc_req sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, __func__, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 		handle_assoc(hapd, mgmt, len, 1, ssi_signal);
 		ret = 1;
 		break;
 	case WLAN_FC_STYPE_DISASSOC:
 		wpa_printf(MSG_DEBUG, "mgmt::disassoc");
-		wpa_msg(hapd->msg_ctx, MSG_INFO, "%s mgmt::disassoc sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, __func__, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 		handle_disassoc(hapd, mgmt, len);
 		ret = 1;
 		break;
@@ -7039,7 +7035,6 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		break;
 	case WLAN_FC_STYPE_ACTION:
 		wpa_printf(MSG_DEBUG, "mgmt::action");
-		wpa_msg(hapd->msg_ctx, MSG_INFO, "%s mgmt::action sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, __func__, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 		ret = handle_action(hapd, mgmt, len, freq);
 		break;
 	default:
@@ -7568,30 +7563,30 @@ void ieee802_11_mgmt_cb(struct hostapd_data *hapd, const u8 *buf, size_t len,
 
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WPA_MSG_WIFI_INF(2, "mgmt::auth stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=", stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "mgmt::auth stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
 		handle_auth_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_ASSOC_RESP:
-		WPA_MSG_WIFI_INF(6, "mgmt::assoc_resp ok=%d sa=" MACSTR " da=" MACSTR " mac=", stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		WPA_MSG_WIFI_INF(S_ASSOC_RESP, "mgmt::assoc_resp stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
 		handle_assoc_cb(hapd, mgmt, len, 0, ok);
 		break;
 	case WLAN_FC_STYPE_REASSOC_RESP:
-		WPA_MSG_WIFI_INF(6, "mgmt::reassoc_resp ok=%d sa=" MACSTR " da=" MACSTR " mac=", stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		WPA_MSG_WIFI_INF(S_ASSOC_RESP, "mgmt::reassoc_resp stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
 		handle_assoc_cb(hapd, mgmt, len, 1, ok);
 		break;
 	case WLAN_FC_STYPE_PROBE_RESP:
-		// WPA_MSG_WIFI_DEBUG(0, "mgmt::probe_resp ok=%d sa=" MACSTR " da=" MACSTR " mac=", stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		// WPA_MSG_WIFI_DEBUG(0, "mgmt::probe_resp stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
 		break;
 	case WLAN_FC_STYPE_DEAUTH:
-		WPA_MSG_WIFI_INF(7, "mgmt::deauth ok=%d sa=" MACSTR " da=" MACSTR " mac=", stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		WPA_MSG_WIFI_INF(S_DEAUTH, "mgmt::deauth stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
 		handle_deauth_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_DISASSOC:
-		WPA_MSG_WIFI_INF(7, "mgmt::disassoc ok=%d sa=" MACSTR " da=" MACSTR " mac=", stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		WPA_MSG_WIFI_INF(S_DEAUTH, "mgmt::disassoc stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
 		handle_disassoc_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_ACTION:
-		WPA_MSG_WIFI_INF(0, "mgmt::action cb ok=%d sa=" MACSTR " da=" MACSTR " mac=", stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		WPA_MSG_WIFI_INF(0, "mgmt::action stype=%d cb ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
 		handle_action_cb(hapd, mgmt, len, ok);
 		break;
 	default:
