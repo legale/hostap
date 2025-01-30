@@ -1752,9 +1752,9 @@ void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 				 struct sta_info *sta, int authorized)
 {
 	if(authorized){
-		WPA_MSG_WIFI_OK(S_HANDSHAKE, "%s authorized=%d sa=" MACSTR, __func__, authorized, MAC2STR(sta->addr));
+		WPA_MSG_WIFI_OK(S_AUTHORIZED, "authorized=%d sa=" MACSTR, authorized, MAC2STR(sta->addr));
 	} else {
-		WPA_MSG_WIFI_OK(S_HANDSHAKE, "%s authorized=%d sa=" MACSTR, __func__, authorized, MAC2STR(sta->addr));
+		WPA_MSG_WIFI_OK(S_DEAUTHORIZED, "authorized=%d sa=" MACSTR, authorized, MAC2STR(sta->addr));
 	}
 
 	const u8 *dev_addr = NULL;
