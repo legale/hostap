@@ -340,7 +340,7 @@ static void hostapd_wpa_auth_set_eapol(void *ctx, const u8 *addr,
 	struct hostapd_data *hapd = ctx;
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 
-	WPA_MSG_WIFI_INF(S_HANDSHAKE, "%s sa=" MACSTR " wpa_eapol_var=%d val=%d", __func__, MAC2STR(sta->addr), var, value);
+	WPA_MSG_WIFI_INF(S_HANDSHAKE, "sa=" MACSTR " wpa_eapol_var=%d val=%d", MAC2STR(sta->addr), var, value);
 
 	if (sta == NULL)
 		return;
