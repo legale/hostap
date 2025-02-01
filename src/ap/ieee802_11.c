@@ -3328,7 +3328,7 @@ static void handle_auth(struct hostapd_data *hapd,
 			const struct ieee80211_mgmt *mgmt, size_t len,
 			int rssi, int from_queue)
 {
-	WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
+	WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->bssid));
 
 	u16 auth_alg, auth_transaction, status_code;
 	u16 resp = WLAN_STATUS_SUCCESS;
@@ -3384,7 +3384,8 @@ static void handle_auth(struct hostapd_data *hapd,
 	    mgmt->u.auth.variable[0] == WLAN_EID_CHALLENGE &&
 	    mgmt->u.auth.variable[1] == WLAN_AUTH_CHALLENGE_LEN)
 		challenge = &mgmt->u.auth.variable[2];
-
+	
+	WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 	wpa_printf(MSG_DEBUG, "authentication: STA=" MACSTR " auth_alg=%d "
 		   "auth_transaction=%d status_code=%d protected=%d%s "
 		   "seq_ctrl=0x%x%s%s",
@@ -3532,8 +3533,18 @@ static void handle_auth(struct hostapd_data *hapd,
 		}
 	}
 
-	res = ieee802_11_allowed_address(hapd, sa, (const u8 *) mgmt, len,
-					 &rad_info);
+	res = ieee802_11_allowed_address(hapd, sa, (const u8 *) mgmt, len, &rad_info);
+	switch(res) {
+		case HOSTAPD_ACL_REJECT:
+		case HOSTAPD_ACL_ACCEPT_TIMEOUT:
+			WPA_MSG_WIFI_ERR(S_AUTH_HANDLE, "acl_res=%d seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
+		case HOSTAPD_ACL_ACCEPT:
+		case HOSTAPD_ACL_PENDING:
+			WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "acl_res=%d seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
+	}
+
+
+	
 	if (res == HOSTAPD_ACL_REJECT) {
 		wpa_msg(hapd->msg_ctx, MSG_DEBUG,
 			"Ignore Authentication frame from " MACSTR
