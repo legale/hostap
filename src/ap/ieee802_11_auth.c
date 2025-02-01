@@ -91,14 +91,15 @@ static int hostapd_acl_cache_get(struct hostapd_data *hapd, const u8 *addr,
 		if (!ether_addr_equal(entry->addr, addr))
 			continue;
 
-		if (os_reltime_expired(&now, &entry->timestamp,
-				       RADIUS_ACL_TIMEOUT))
+		if (os_reltime_expired(&now, &entry->timestamp, RADIUS_ACL_TIMEOUT)){
+			WPA_MSG_WIFI_ERR(S_AUTH_HANDLE, "mac=" MACSTR " cache entry has expired", MAC2STR(addr));
 			return -1; /* entry has expired */
+		}
 		*out = entry->info;
-
 		return entry->accepted;
 	}
 
+	WPA_MSG_WIFI_ERR(S_AUTH_HANDLE, "mac=" MACSTR " cache entry not found", MAC2STR(addr));
 	return -1;
 }
 #endif /* CONFIG_NO_RADIUS */
@@ -286,10 +287,12 @@ int hostapd_allowed_address(struct hostapd_data *hapd, const u8 *addr,
 		/* Check whether ACL cache has an entry for this station */
 		res = hostapd_acl_cache_get(hapd, addr, out);
 		if (res == HOSTAPD_ACL_ACCEPT ||
-		    res == HOSTAPD_ACL_ACCEPT_TIMEOUT)
+		    res == HOSTAPD_ACL_ACCEPT_TIMEOUT){
 			return res;
-		if (res == HOSTAPD_ACL_REJECT)
+		}
+		if (res == HOSTAPD_ACL_REJECT){
 			return HOSTAPD_ACL_REJECT;
+		}
 
 		query = hapd->acl_queries;
 		while (query) {
