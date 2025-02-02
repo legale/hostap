@@ -392,6 +392,10 @@ static void vlan_newlink_tagged(int vlan_naming, const char *tagged_interface,
 	int clean;
 	int ret;
 
+	vlan_set_name_type(vlan_naming ==
+			   DYNAMIC_VLAN_NAMING_WITH_DEVICE ?
+			   VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD :
+			   VLAN_NAME_TYPE_PLUS_VID_NO_PAD);
 	if (vlan_naming == DYNAMIC_VLAN_NAMING_WITH_DEVICE)
 		ret = os_snprintf(vlan_ifname, sizeof(vlan_ifname), "%s.%d",
 				  tagged_interface, vid);
@@ -517,7 +521,10 @@ static void vlan_dellink_tagged(int vlan_naming, const char *tagged_interface,
 	char vlan_ifname[IFNAMSIZ];
 	int clean;
 	int ret;
-
+	vlan_set_name_type(vlan_naming ==
+			   DYNAMIC_VLAN_NAMING_WITH_DEVICE ?
+			   VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD :
+			   VLAN_NAME_TYPE_PLUS_VID_NO_PAD);
 	if (vlan_naming == DYNAMIC_VLAN_NAMING_WITH_DEVICE)
 		ret = os_snprintf(vlan_ifname, sizeof(vlan_ifname), "%s.%d",
 				  tagged_interface, vid);
@@ -754,11 +761,6 @@ full_dynamic_vlan_init(struct hostapd_data *hapd)
 	priv = os_zalloc(sizeof(*priv));
 	if (priv == NULL)
 		return NULL;
-
-	vlan_set_name_type(hapd->conf->ssid.vlan_naming ==
-			   DYNAMIC_VLAN_NAMING_WITH_DEVICE ?
-			   VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD :
-			   VLAN_NAME_TYPE_PLUS_VID_NO_PAD);
 
 	priv->s = socket(PF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
 	if (priv->s < 0) {
