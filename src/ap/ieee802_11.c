@@ -3473,13 +3473,15 @@ static void handle_auth(struct hostapd_data *hapd,
 	}
 
 	res = ieee802_11_allowed_address(hapd, sa, (const u8 *) mgmt, len, &rad_info);
+	int is_remote = hapd->conf->macaddr_acl == USE_EXTERNAL_RADIUS_AUTH ? 1 : 0;
+	int stage = is_remote ? S_AUTH_HANDLE_RADIUS : S_AUTH_HANDLE;
 	switch(res) {
 		case HOSTAPD_ACL_REJECT:
 		case HOSTAPD_ACL_ACCEPT_TIMEOUT:
-			WPA_MSG_WIFI_ERR(S_AUTH_HANDLE, "acl_res=%d seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
+			WPA_MSG_WIFI_ERR(stage, "remote_acl=%d acl_res=%d seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, is_remote, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 		case HOSTAPD_ACL_ACCEPT:
 		case HOSTAPD_ACL_PENDING:
-			WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "acl_res=%d seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
+			WPA_MSG_WIFI_INF(stage, "remote_acl=%d acl_res=%d seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, is_remote, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
 	}
 
 
@@ -6904,7 +6906,7 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	stype = WLAN_FC_GET_STYPE(fc);
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WPA_MSG_WIFI_INF(S_AUTH, "frame=mgmt::auth sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_AUTH_RX, "frame=mgmt::auth sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
 		break;
 	case WLAN_FC_STYPE_ASSOC_REQ:
 		WPA_MSG_WIFI_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
