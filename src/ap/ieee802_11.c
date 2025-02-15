@@ -7032,11 +7032,21 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 			       HOSTAPD_LEVEL_DEBUG,
 			       "unknown mgmt frame subtype %d", stype);
 		break;
+    }
+	switch (stype) {
+	case WLAN_FC_STYPE_ASSOC_REQ:
+	case WLAN_FC_STYPE_REASSOC_REQ:
+		char *ssidbuf[SSID_MAX_LEN];
+		ssidbuf[0] = '\0';
+		if (hapd->conf) {
+			memcpy(ssidbuf, hapd->conf->ssid.ssid, hapd->conf->ssid.ssid_len);
+		}
+		WPA_MSG_WIFI_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req/reassoc_req ssid=%s bssid=" MACSTR, ssidbuf, MAC2STR(mgmt->bssid));
+		break;
 	}
 
-	return ret;
+    return ret;
 }
-
 
 static void handle_auth_cb(struct hostapd_data *hapd,
 			   const struct ieee80211_mgmt *mgmt,
