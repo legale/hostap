@@ -6840,6 +6840,84 @@ static void notify_mgmt_frame(struct hostapd_data *hapd, const u8 *buf,
 	}
 }
 
+#include <pcap/pcap.h>
+#include <endian.h>
+
+static int anal_sockfd = -1;
+
+#pragma pack(push, 1)
+struct pcap_global_hdr {
+    uint32_t magic_number;
+    uint16_t version_major;
+    uint16_t version_minor;
+    int32_t thiszone;
+    uint32_t sigfigs;
+    uint32_t snaplen;
+    uint32_t network;
+};
+
+struct pcap_pkt_hdr {
+    uint32_t ts_sec;
+    uint32_t ts_usec;
+    uint32_t incl_len;
+    uint32_t orig_len;
+};
+#pragma pack(pop)
+
+
+void send_pcap_frame(int sockfd, const u8 *buf, size_t len) {
+    uint8_t pcap_buffer[sizeof(struct pcap_global_hdr) + sizeof(struct pcap_pkt_hdr) + len];
+    size_t offset = 0;
+
+	/* его не передаем, должен быть добавлена у получателя
+    // Глобальный заголовок (snaplen = максимальный размер фрейма) 
+    struct pcap_global_hdr ghdr = {
+        .magic_number = htole32(0xa1b2c3d4),
+        .version_major = htole16(2),
+        .version_minor = htole16(4),
+        .thiszone = 0,
+        .sigfigs = 0,
+        .snaplen = htole32(2048), // Фиксированное значение, например 2048
+        .network = htole32(105) //LINKTYPE_IEEE802_11 DLT_IEEE802_11
+    };
+    memcpy(pcap_buffer + offset, &ghdr, sizeof(ghdr));
+    offset += sizeof(ghdr);
+
+	uint32_t snap = len > 2048 ? 2048 : len;
+	*/
+	uint32_t snap = len;
+
+
+    // Заголовок пакета (incl_len = orig_len = реальная длина фрейма)
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    struct pcap_pkt_hdr phdr = {
+        .ts_sec = htole32(tv.tv_sec),
+        .ts_usec = htole32(tv.tv_usec),
+        .incl_len = htole32(snap),
+        .orig_len = htole32(len)
+    };
+    memcpy(pcap_buffer + offset, &phdr, sizeof(phdr));
+    offset += sizeof(phdr);
+
+    // Данные фрейма
+    memcpy(pcap_buffer + offset, buf, len);
+    offset += snap;
+
+    send(sockfd, pcap_buffer, offset, 0);
+}
+
+int setup_anal_socket() {
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(7890),
+        .sin_addr.s_addr = inet_addr("127.0.0.1")
+    };
+    connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));
+    return sockfd;
+}
+
 
 /**
  * ieee802_11_mgmt - process incoming IEEE 802.11 management frames
@@ -6857,6 +6935,12 @@ static void notify_mgmt_frame(struct hostapd_data *hapd, const u8 *buf,
 int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		    struct hostapd_frame_info *fi)
 {
+	if (anal_sockfd == -1) {
+        anal_sockfd = setup_anal_socket();
+    }
+	send_pcap_frame(anal_sockfd, buf, len);
+
+
 	// WPA_MSG_WIFI_INF(0, "");
 	struct ieee80211_mgmt *mgmt;
 	u16 fc, stype;
@@ -6883,7 +6967,7 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	stype = WLAN_FC_GET_STYPE(fc);
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WPA_MSG_WIFI_INF(S_AUTH_RX, "frame=mgmt::auth sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WPA_MSG_WIFI_INF(S_AUTH_RX, "frame=mgmt::auth sa=" MACSTR " da=" MACSTR "bssid=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->bssid), stype);
 		break;
 	case WLAN_FC_STYPE_ASSOC_REQ:
 		WPA_MSG_WIFI_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
