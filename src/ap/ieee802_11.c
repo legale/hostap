@@ -6840,84 +6840,91 @@ static void notify_mgmt_frame(struct hostapd_data *hapd, const u8 *buf,
 	}
 }
 
+#include <endian.h> //htole32
 #include <pcap/pcap.h>
-#include <endian.h>
+#include <fcntl.h>
+#define FIFO_PATH "/tmp/anal_fifo"
 
 static int anal_sockfd = -1;
 
 #pragma pack(push, 1)
-struct pcap_global_hdr {
-    uint32_t magic_number;
-    uint16_t version_major;
-    uint16_t version_minor;
-    int32_t thiszone;
-    uint32_t sigfigs;
-    uint32_t snaplen;
-    uint32_t network;
+struct pcap_file_header_ {
+	bpf_u_int32 magic;
+	u_short version_major;
+	u_short version_minor;
+	bpf_int32 thiszone;	/* gmt to local correction; this is always 0 */
+	bpf_u_int32 sigfigs;	/* accuracy of timestamps; this is always 0 */
+	bpf_u_int32 snaplen;	/* max length saved portion of each pkt */
+	bpf_u_int32 linktype;	/* data link type (LINKTYPE_*) */
 };
 
 struct pcap_pkt_hdr {
-    uint32_t ts_sec;
-    uint32_t ts_usec;
-    uint32_t incl_len;
-    uint32_t orig_len;
+  uint32_t ts_sec;
+  uint32_t ts_usec;
+  uint32_t incl_len;
+  uint32_t orig_len;
 };
 #pragma pack(pop)
 
-
 void send_pcap_frame(int sockfd, const u8 *buf, size_t len) {
-    uint8_t pcap_buffer[sizeof(struct pcap_global_hdr) + sizeof(struct pcap_pkt_hdr) + len];
-    size_t offset = 0;
+  uint8_t pcap_buffer[sizeof(struct pcap_pkt_hdr) + len];
+  size_t offset = 0;
+  /* его не передаем, должен быть добавлена у получателя
+// Глобальный заголовок (snaplen = максимальный размер фрейма)
+struct pcap_global_hdr ghdr = {
+  .magic_number = htole32(0xa1b2c3d4),
+  .version_major = htole16(2),
+  .version_minor = htole16(4), 
+  .thiszone = 0,
+  .sigfigs = 0,
+  .snaplen = htole32(2048), // Фиксированное значение, например 2048
+  .linktype = htole32(105) //LINKTYPE_IEEE802_11 DLT_IEEE802_11
+};
+memcpy(pcap_buffer + offset, &ghdr, sizeof(ghdr));
+offset += sizeof(ghdr);
 
-	/* его не передаем, должен быть добавлена у получателя
-    // Глобальный заголовок (snaplen = максимальный размер фрейма) 
-    struct pcap_global_hdr ghdr = {
-        .magic_number = htole32(0xa1b2c3d4),
-        .version_major = htole16(2),
-        .version_minor = htole16(4),
-        .thiszone = 0,
-        .sigfigs = 0,
-        .snaplen = htole32(2048), // Фиксированное значение, например 2048
-        .network = htole32(105) //LINKTYPE_IEEE802_11 DLT_IEEE802_11
-    };
-    memcpy(pcap_buffer + offset, &ghdr, sizeof(ghdr));
-    offset += sizeof(ghdr);
+  uint32_t snap = len > 2048 ? 2048 : len;
+  */
 
-	uint32_t snap = len > 2048 ? 2048 : len;
-	*/
-	uint32_t snap = len;
+  uint32_t snap = len;
+
+  // Заголовок пакета (incl_len = orig_len = реальная длина фрейма)
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  struct pcap_pkt_hdr phdr = {.ts_sec = htole32(tv.tv_sec),
+                              .ts_usec = htole32(tv.tv_usec),
+                              .incl_len = htole32(snap),
+                              .orig_len = htole32(len)};
+  memcpy(pcap_buffer + offset, &phdr, sizeof(phdr));
+  offset += sizeof(phdr);
+
+  // Данные фрейма
+  memcpy(pcap_buffer + offset, buf, len);
+  offset += snap;
 
 
-    // Заголовок пакета (incl_len = orig_len = реальная длина фрейма)
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    struct pcap_pkt_hdr phdr = {
-        .ts_sec = htole32(tv.tv_sec),
-        .ts_usec = htole32(tv.tv_usec),
-        .incl_len = htole32(snap),
-        .orig_len = htole32(len)
-    };
-    memcpy(pcap_buffer + offset, &phdr, sizeof(phdr));
-    offset += sizeof(phdr);
-
-    // Данные фрейма
-    memcpy(pcap_buffer + offset, buf, len);
-    offset += snap;
-
-    send(sockfd, pcap_buffer, offset, 0);
+  if (write(sockfd, pcap_buffer, offset) < 0) {
+    // do not show any errors
+	//perror("send_pcap_frame write");
+  }
 }
 
-int setup_anal_socket() {
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(7890),
-        .sin_addr.s_addr = inet_addr("127.0.0.1")
-    };
-    connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));
-    return sockfd;
-}
+int setup_anal_fifo() {
+  // Создание FIFO, если не существует
+  if (mkfifo(FIFO_PATH, 0666) < 0) {
+    // do not show any errors
+	// perror("setup_anal_fifo mkfifo");
+  }
 
+  // Открываем FIFO для записи (блокирующий режим)
+  int fd = open(FIFO_PATH, O_WRONLY | O_NONBLOCK);
+  if (fd < 0) {
+    // do not show any errors
+	// perror("setup_anal_fifo open");
+  }
+
+  return fd;
+}
 
 /**
  * ieee802_11_mgmt - process incoming IEEE 802.11 management frames
@@ -6936,7 +6943,7 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		    struct hostapd_frame_info *fi)
 {
 	if (anal_sockfd == -1) {
-        anal_sockfd = setup_anal_socket();
+        anal_sockfd = setup_anal_fifo();
     }
 	send_pcap_frame(anal_sockfd, buf, len);
 
