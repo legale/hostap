@@ -590,6 +590,7 @@ void hostapd_free_link_stas(struct hostapd_data *hapd)
  */
 void ap_handle_timer(void *eloop_ctx, void *timeout_ctx)
 {
+	wpa_msg_glo(0, "ap_handle_timer");
 	struct hostapd_data *hapd = eloop_ctx;
 	struct sta_info *sta = timeout_ctx;
 	unsigned long next_time = 0;
