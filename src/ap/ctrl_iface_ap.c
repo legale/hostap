@@ -5,6 +5,7 @@
  * This software may be distributed under the terms of the BSD license.
  * See README for more details.
  */
+#include <time.h>
 
 #include "utils/includes.h"
 
@@ -764,12 +765,16 @@ int hostapd_ctrl_iface_signature(struct hostapd_data *hapd,
 }
 #endif /* CONFIG_TAXONOMY */
 
+struct timespec ts = {0};
 
 int hostapd_ctrl_iface_poll_sta(struct hostapd_data *hapd,
 				const char *txtaddr)
 {
 	u8 addr[ETH_ALEN];
 	struct sta_info *sta;
+
+	printf("CTRL_IFACE POLL_STA %s\n", txtaddr);
+	wpa_msg_glo(MSG_DEBUG, "CTRL_IFACE POLL_STA %s", txtaddr);
 
 	wpa_dbg(hapd->msg_ctx, MSG_DEBUG, "CTRL_IFACE POLL_STA %s", txtaddr);
 
@@ -780,6 +785,8 @@ int hostapd_ctrl_iface_poll_sta(struct hostapd_data *hapd,
 	if (!sta)
 		return -1;
 
+	u8 bcast[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	clock_gettime(CLOCK_MONOTONIC, &ts);
 	hostapd_drv_poll_client(hapd, hapd->own_addr, addr,
 				sta->flags & WLAN_STA_WMM);
 	return 0;

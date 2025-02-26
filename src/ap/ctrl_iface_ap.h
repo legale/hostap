@@ -9,6 +9,8 @@
 #ifndef CTRL_IFACE_AP_H
 #define CTRL_IFACE_AP_H
 
+extern struct timespec ts;
+
 int hostapd_ctrl_iface_sta_first(struct hostapd_data *hapd,
 				 char *buf, size_t buflen);
 int hostapd_ctrl_iface_sta(struct hostapd_data *hapd, const char *txtaddr,
