@@ -7001,7 +7001,7 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	stype = WLAN_FC_GET_STYPE(fc);
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WPA_MSG_WIFI_INF(S_AUTH_RX, "frame=mgmt::auth sa=" MACSTR " da=" MACSTR "bssid=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->bssid), stype);
+		WPA_MSG_WIFI_INF(S_AUTH_RX, "frame=mgmt::auth sa=" MACSTR " da=" MACSTR " bssid=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->bssid), stype);
 		break;
 	case WLAN_FC_STYPE_ASSOC_REQ:
 		WPA_MSG_WIFI_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
