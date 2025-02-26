@@ -3957,13 +3957,12 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 					      socklen_t fromlen)
 {
 	int reply_len, res;
-
 	os_memcpy(reply, "OK\n", 3);
 	reply_len = 3;
 
 	if (os_strcmp(buf, "PING") == 0) {
-		os_memcpy(reply, "PONG\n", 5);
-		reply_len = 5;
+		os_memcpy(reply, "IFNAME PONG\n", sizeof("IFNAME PONG\n"));
+		reply_len =  sizeof("IFNAME PONG\n");
 	} else if (os_strncmp(buf, "RELOG", 5) == 0) {
 		if (wpa_debug_reopen_file() < 0)
 			reply_len = -1;
@@ -4046,6 +4045,7 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 							 reply, reply_size);
 #endif /* CONFIG_TAXONOMY */
 	} else if (os_strncmp(buf, "POLL_STA ", 9) == 0) {
+		wpa_msg_glo(MSG_DEBUG, "CTRL_IFACE POLL_STA %s", buf);
 		if (hostapd_ctrl_iface_poll_sta(hapd, buf + 9))
 			reply_len = -1;
 	} else if (os_strcmp(buf, "STOP_AP") == 0) {
@@ -5773,8 +5773,8 @@ static void hostapd_global_ctrl_iface_receive(int sock, void *eloop_ctx,
 	}
 
 	if (os_strcmp(buf, "PING") == 0) {
-		os_memcpy(reply, "PONG\n", 5);
-		reply_len = 5;
+		os_memcpy(reply, "GLOBAL PONG\n", sizeof("GLOBAL PONG\n"));
+		reply_len = sizeof("GLOBAL PONG\n");
 	} else if (os_strncmp(buf, "RELOG", 5) == 0) {
 		if (wpa_debug_reopen_file() < 0)
 			reply_len = -1;

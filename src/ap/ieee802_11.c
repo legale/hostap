@@ -7,6 +7,8 @@
  * See README for more details.
  */
 
+#include <time.h>
+
 #include "utils/includes.h"
 
 #ifndef CONFIG_NATIVE_WINDOWS
@@ -62,6 +64,7 @@
 #include "comeback_token.h"
 #include "nan_usd_ap.h"
 #include "pasn/pasn_common.h"
+#include "ap/ctrl_iface_ap.h"
 
 
 #ifdef CONFIG_FILS
@@ -6995,7 +6998,7 @@ struct pcap_pkt_hdr {
 };
 #pragma pack(pop)
 
-void send_pcap_frame(int sockfd, const u8 *buf, size_t len) {
+void send_pcap_frame(int sockfd, const u8 *buf, size_t len, int ssi_signal) {
   uint8_t pcap_buffer[sizeof(struct pcap_pkt_hdr) + len];
   size_t offset = 0;
   /* его не передаем, должен быть добавлена у получателя
@@ -7074,7 +7077,6 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	if (anal_sockfd == -1) {
         anal_sockfd = setup_anal_fifo();
     }
-	send_pcap_frame(anal_sockfd, buf, len);
 
 
 	// WPA_MSG_WIFI_INF(0, "");
@@ -7083,6 +7085,8 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	int ret = 0;
 	unsigned int freq;
 	int ssi_signal = fi ? fi->ssi_signal : 0;
+	send_pcap_frame(anal_sockfd, buf, len, ssi_signal);
+
 #ifdef CONFIG_NAN_USD
 	static const u8 nan_network_id[ETH_ALEN] =
 		{ 0x51, 0x6f, 0x9a, 0x01, 0x00, 0x00 };
@@ -7811,7 +7815,7 @@ void ieee802_11_mgmt_cb(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		handle_action_cb(hapd, mgmt, len, ok);
 		break;
 	default:
-		WPA_MSG_WIFI_INF(0, "unknown mgmt cb frame subtype %d", stype);
+	WPA_MSG_WIFI_INF(0, "unknown mgmt cb frame subtype %d", stype);
 		wpa_printf(MSG_INFO, "unknown mgmt cb frame subtype %d", stype);
 		break;
 	}
@@ -7873,6 +7877,8 @@ void hostapd_tx_status(struct hostapd_data *hapd, const u8 *addr,
 
 void hostapd_client_poll_ok(struct hostapd_data *hapd, const u8 *addr)
 {
+	static struct timespec ts_end;
+	clock_gettime(CLOCK_MONOTONIC, &ts_end);
 	struct sta_info *sta;
 	struct hostapd_iface *iface = hapd->iface;
 
@@ -7888,7 +7894,9 @@ void hostapd_client_poll_ok(struct hostapd_data *hapd, const u8 *addr)
 	}
 	if (sta == NULL)
 		return;
-	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POLL_OK MACSTR,
+
+	wpa_msg(hapd->msg_ctx, MSG_INFO, "hostapd_client_poll_ok ns_diff: %" PRIuMAX " mac=" MACSTR, diff_nsec(ts, ts_end), MAC2STR(addr));
+	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POLL_OK MACSTR " client poll ok",
 		MAC2STR(sta->addr));
 	if (!(sta->flags & WLAN_STA_PENDING_POLL))
 		return;
