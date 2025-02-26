@@ -6,6 +6,7 @@
  * See README for more details.
  */
 
+ #include <time.h>
 
 #include "includes.h"
 
@@ -218,6 +219,18 @@ int a2mac_80211x(const u8 *mac_str, u8 *mac) {
         return 1;
 
     return 0;
+}
+
+uintmax_t diff_nsec(struct timespec t1, struct timespec t2) {
+	// check if t2 > t1
+	if (t2.tv_sec < t1.tv_sec || (t2.tv_sec == t1.tv_sec && t2.tv_nsec <= t1.tv_nsec)) {
+		return 0;
+	}
+
+	int64_t sec_diff = t2.tv_sec - t1.tv_sec;
+	int64_t nsec_diff = t2.tv_nsec - t1.tv_nsec;
+
+	return (uintmax_t)(sec_diff * 1000000000LL + nsec_diff);
 }
 
 struct hapd_interfaces *global_ifaces = NULL;
