@@ -156,7 +156,7 @@ struct radius_msg_list {
  * calling radius_client_deinit(). The pointer to this opaque data is used in
  * calls to other functions as an identifier for the RADIUS client instance.
  */
-struct radius_client_data {
+struct radius_client_data { 
 	/**
 	 * ctx - Context pointer for hostapd_logger() callbacks
 	 */
@@ -748,6 +748,14 @@ int radius_client_send(struct radius_client_data *radius,
 		       const u8 *addr)
 {
 	struct hostapd_radius_servers *conf = radius->conf;
+	if(addr && msg_type == RADIUS_AUTH){
+		char abuf[50];
+		abuf[0] = '\0';
+		hostapd_ip_txt(&conf->auth_server->addr, abuf, sizeof(abuf));
+		WPA_MSG_WIFI_INF(S_RADIUS_REQ, "auth_server_req=%s radius_type=%d sa=" MACSTR, abuf, msg_type, MAC2STR(addr));
+		
+	}
+
 	const u8 *shared_secret;
 	size_t shared_secret_len;
 	char *name;
@@ -817,7 +825,11 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	RadiusType msg_type = (RadiusType) sock_ctx;
 	int len, roundtrip;
 	unsigned char buf[RADIUS_MAX_MSG_LEN];
-	struct msghdr msghdr = {0};
+	struct sockaddr_storage addr;
+	struct msghdr msghdr = {
+		.msg_name = &addr,
+		.msg_namelen = sizeof(addr),
+	};
 	struct iovec iov;
 	struct radius_msg *msg;
 	struct radius_hdr *hdr;
@@ -845,6 +857,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	msghdr.msg_flags = 0;
 	len = recvmsg(sock, &msghdr, MSG_DONTWAIT);
 	if (len < 0) {
+		WPA_MSG_WIFI_ERR(S_RADIUS_RES, "recvmsg[RADIUS]: %d %s", errno, strerror(errno));
 		wpa_printf(MSG_INFO, "recvmsg[RADIUS]: %s", strerror(errno));
 		return;
 	}
@@ -911,7 +924,37 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 		goto fail;
 	}
 
-	os_get_reltime(&now);
+	char ip_str[INET6_ADDRSTRLEN]; // string bufffer for the ipv4 or ipv6
+	ip_str[0] = '\0';
+	struct sockaddr *sa = (struct sockaddr *)msghdr.msg_name;
+	int safamily = 0;
+	if (sa) {
+		safamily = sa->sa_family;
+		void *addr = NULL;
+		if(sa->sa_family == AF_INET){
+			addr = (void *)&((struct sockaddr_in *)sa)->sin_addr;
+		} else if(sa->sa_family == AF_INET6){
+			addr = (void *)&((struct sockaddr_in6 *)sa)->sin6_addr;
+		}
+	
+		if (addr && inet_ntop(sa->sa_family, addr, ip_str, INET6_ADDRSTRLEN) == NULL) {
+			strcpy(ip_str, "error");
+		}
+	} else {
+		strcpy(ip_str, "unknown");
+	}
+
+	WPA_MSG_WIFI_INF(
+		S_RADIUS_RES,
+		"found corresponding RADIUS req type=%d id=%d sa_family=%d "
+		"sa=" MACSTR ""
+		" %s=%s",
+		msg_type, hdr->identifier, safamily,
+		MAC2STR(req->addr),
+		msg_type == RADIUS_AUTH ? "auth_server_res" : "acct_server_res", ip_str);
+
+
+        os_get_reltime(&now);
 	roundtrip = (now.sec - req->last_attempt.sec) * 100 +
 		(now.usec - req->last_attempt.usec) / 10000;
 	hostapd_logger(radius->ctx, req->addr, HOSTAPD_MODULE_RADIUS,

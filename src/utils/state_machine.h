@@ -83,7 +83,7 @@ sm->data ## _ ## state = machine ## _ ## _state;
 #define SM_ENTRY_MA(machine, _state, data) \
 if (!global || sm->data ## _ ## state != machine ## _ ## _state) { \
 	sm->changed = true; \
-	wpa_printf(MSG_DEBUG, STATE_MACHINE_DEBUG_PREFIX ": " MACSTR " " \
+	WPA_MSG_WIFI_INF(S_HANDSHAKE, STATE_MACHINE_DEBUG_PREFIX ": sa=" MACSTR " " \
 		   #machine " entering state " #_state, \
 		   MAC2STR(STATE_MACHINE_ADDR)); \
 } \

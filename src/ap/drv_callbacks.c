@@ -75,6 +75,7 @@ void hostapd_notify_assoc_fils_finish(struct hostapd_data *hapd,
 				      sta->fils_pending_assoc_is_reassoc,
 				      WLAN_STATUS_SUCCESS,
 				      buf, p - buf);
+	if(sta) WPA_MSG_WIFI_INF(0, "sta authorized sa=" MACSTR, MAC2STR(sta->addr));
 	ap_sta_set_authorized(hapd, sta, 1);
 	new_assoc = (sta->flags & WLAN_STA_ASSOC) == 0;
 	sta->flags |= WLAN_STA_AUTH | WLAN_STA_ASSOC;
@@ -690,8 +691,10 @@ skip_wpa_check:
 	if (sta->auth_alg == WLAN_AUTH_FT ||
 	    sta->auth_alg == WLAN_AUTH_FILS_SK ||
 	    sta->auth_alg == WLAN_AUTH_FILS_SK_PFS ||
-	    sta->auth_alg == WLAN_AUTH_FILS_PK)
+	    sta->auth_alg == WLAN_AUTH_FILS_PK){
+		if(sta) WPA_MSG_WIFI_INF(0, "sta authorized sa=" MACSTR, MAC2STR(sta->addr));
 		ap_sta_set_authorized(hapd, sta, 1);
+	}
 #else /* CONFIG_IEEE80211R_AP || CONFIG_FILS */
 	/* Keep compiler silent about unused variables */
 	if (status) {
@@ -766,7 +769,7 @@ void hostapd_notif_disassoc(struct hostapd_data *hapd, const u8 *addr)
 			   MACSTR, MAC2STR(addr));
 		return;
 	}
-
+	if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	sta->flags &= ~(WLAN_STA_AUTH | WLAN_STA_ASSOC);
 	hostapd_set_sta_flags(hapd, sta);

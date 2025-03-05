@@ -10,6 +10,8 @@
 
 #include "common.h"
 
+#include "../ap/hostapd.h"
+
 #ifdef CONFIG_DEBUG_SYSLOG
 #include <syslog.h>
 #endif /* CONFIG_DEBUG_SYSLOG */
@@ -194,6 +196,24 @@ void wpa_debug_close_linux_tracing(void)
 
 #endif /* CONFIG_DEBUG_LINUX_TRACING */
 
+struct hapd_interfaces *global_ifaces = NULL;
+
+void wpa_msg_glo(int level, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+
+    char buf[1024];
+	
+    int len = vsnprintf(buf, sizeof(buf), fmt, ap);
+
+    if (len < 0 || len >= sizeof(buf)) {
+        fprintf(stderr, "Error formatting message\n");
+    }
+
+    va_end(ap);
+
+    hostapd_ctrl_iface_send_internal(global_ifaces->global_ctrl_sock, &global_ifaces->global_ctrl_dst, "global", level, buf, len);
+}
 
 /**
  * wpa_printf - conditional printf

@@ -113,11 +113,13 @@ void ieee802_1x_set_sta_authorized(struct hostapd_data *hapd,
 		return;
 
 	if (authorized) {
+		if(sta) WPA_MSG_WIFI_INF(0, "sta authorized sa=" MACSTR, MAC2STR(sta->addr));
 		ap_sta_set_authorized(hapd, sta, 1);
 		res = hostapd_set_authorized(hapd, sta, 1);
 		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE8021X,
 			       HOSTAPD_LEVEL_DEBUG, "authorizing port");
 	} else {
+		if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
 		ap_sta_set_authorized(hapd, sta, 0);
 		res = hostapd_set_authorized(hapd, sta, 0);
 		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE8021X,

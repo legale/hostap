@@ -637,6 +637,7 @@ static void hostapd_periodic(void *eloop_ctx, void *timeout_ctx)
 int main(int argc, char *argv[])
 {
 	struct hapd_interfaces interfaces;
+	global_ifaces = &interfaces; //save interfaces to global ptr
 	int ret = 1;
 	size_t i, j;
 	int c, debug = 0, daemonize = 0;

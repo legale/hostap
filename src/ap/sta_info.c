@@ -194,6 +194,7 @@ void ap_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 	accounting_sta_stop(hapd, sta);
 
 	/* just in case */
+	if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	hostapd_set_sta_flags(hapd, sta);
 
@@ -579,6 +580,7 @@ skip_poll:
 		break;
 	case STA_DISASSOC:
 	case STA_DISASSOC_FROM_CLI:
+		if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
 		ap_sta_set_authorized(hapd, sta, 0);
 		sta->flags &= ~WLAN_STA_ASSOC;
 		hostapd_set_sta_flags(hapd, sta);
@@ -849,6 +851,7 @@ void ap_sta_disassociate(struct hostapd_data *hapd, struct sta_info *sta,
 		sta->flags &= ~(WLAN_STA_ASSOC | WLAN_STA_ASSOC_REQ_OK);
 		sta->timeout_next = STA_DEAUTH;
 	}
+	if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	hostapd_set_sta_flags(hapd, sta);
 	wpa_printf(MSG_DEBUG, "%s: reschedule ap_handle_timer timeout "
@@ -900,6 +903,7 @@ void ap_sta_deauthenticate(struct hostapd_data *hapd, struct sta_info *sta,
 		   hapd->conf->iface, MAC2STR(sta->addr));
 	sta->last_seq_ctrl = WLAN_INVALID_MGMT_SEQ;
 	sta->flags &= ~(WLAN_STA_AUTH | WLAN_STA_ASSOC | WLAN_STA_ASSOC_REQ_OK);
+	if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	hostapd_set_sta_flags(hapd, sta);
 	sta->timeout_next = STA_REMOVE;
@@ -1259,10 +1263,27 @@ const char * ap_sta_wpa_get_keyid(struct hostapd_data *hapd,
 	return psk->keyid;
 }
 
+bool ap_sta_set_authorized_flag(struct hostapd_data *hapd, struct sta_info *sta, int authorized) {
+  if (!!authorized == !!(sta->flags & WLAN_STA_AUTHORIZED))
+    return false;
 
-void ap_sta_set_authorized(struct hostapd_data *hapd, struct sta_info *sta,
+  if (authorized) {
+    sta->flags |= WLAN_STA_AUTHORIZED;
+  } else {
+    sta->flags &= ~WLAN_STA_AUTHORIZED;
+  }
+  return true;
+}
+
+void ap_sta_set_authorized_event(struct hostapd_data *hapd, struct sta_info *sta,
 			   int authorized)
 {
+	if(authorized){
+		WPA_MSG_WIFI_OK(S_AUTHORIZED, "authorized=%d sa=" MACSTR, authorized, MAC2STR(sta->addr));
+	} else {
+		WPA_MSG_WIFI_OK(S_DEAUTHORIZED, "authorized=%d sa=" MACSTR, authorized, MAC2STR(sta->addr));
+	}
+
 	const u8 *dev_addr = NULL;
 	char buf[100];
 #ifdef CONFIG_P2P
@@ -1270,13 +1291,7 @@ void ap_sta_set_authorized(struct hostapd_data *hapd, struct sta_info *sta,
 	u8 ip_addr_buf[4];
 #endif /* CONFIG_P2P */
 
-	if (!!authorized == !!(sta->flags & WLAN_STA_AUTHORIZED))
-		return;
 
-	if (authorized)
-		sta->flags |= WLAN_STA_AUTHORIZED;
-	else
-		sta->flags &= ~WLAN_STA_AUTHORIZED;
 
 #ifdef CONFIG_P2P
 	if (hapd->p2p_group == NULL) {
@@ -1348,6 +1363,14 @@ void ap_sta_set_authorized(struct hostapd_data *hapd, struct sta_info *sta,
 }
 
 
+void ap_sta_set_authorized(struct hostapd_data *hapd, struct sta_info *sta,
+	int authorized)
+{
+if (!ap_sta_set_authorized_flag(hapd, sta, authorized))
+return;
+ap_sta_set_authorized_event(hapd, sta, authorized);
+}
+
 void ap_sta_disconnect(struct hostapd_data *hapd, struct sta_info *sta,
 		       const u8 *addr, u16 reason)
 {
@@ -1368,6 +1391,7 @@ void ap_sta_disconnect(struct hostapd_data *hapd, struct sta_info *sta,
 
 	if (sta == NULL)
 		return;
+	if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	sta->flags &= ~(WLAN_STA_AUTH | WLAN_STA_ASSOC);
 	hostapd_set_sta_flags(hapd, sta);
@@ -1546,6 +1570,7 @@ int ap_sta_re_add(struct hostapd_data *hapd, struct sta_info *sta)
 	 * this, station's added_unassoc flag is cleared once the station has
 	 * completed association.
 	 */
+	if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	hostapd_drv_sta_remove(hapd, sta->addr);
 	sta->flags &= ~(WLAN_STA_ASSOC | WLAN_STA_AUTH | WLAN_STA_AUTHORIZED);

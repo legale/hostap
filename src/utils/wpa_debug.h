@@ -11,6 +11,8 @@
 
 #include "wpabuf.h"
 
+extern struct hapd_interfaces *global_ifaces;
+
 extern int wpa_debug_level;
 extern int wpa_debug_show_keys;
 extern int wpa_debug_timestamp;
@@ -20,7 +22,7 @@ extern int wpa_debug_syslog;
  * use these for debugging purposes. */
 
 enum {
-	MSG_EXCESSIVE, MSG_MSGDUMP, MSG_DEBUG, MSG_INFO, MSG_WARNING, MSG_ERROR
+	MSG_EXCESSIVE, MSG_MSGDUMP, MSG_DEBUG, MSG_INFO, MSG_WARNING, MSG_ERROR, MSG_WIFIMON
 };
 
 #ifdef CONFIG_NO_STDOUT_DEBUG
@@ -366,5 +368,50 @@ static inline void wpa_debug_close_linux_tracing(void)
 
 const char * debug_level_str(int level);
 int str_to_debug_level(const char *s);
+
+
+
+#define __FILENAME__ (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
+
+typedef enum wifi_stage {
+  S_UNK,                // unknown stage
+  S_AUTH_REQ,           // incoming mgmt::auth frame
+  S_AUTH_HANDLE,        // handle auth
+  S_AUTH_HANDLE_RADIUS, // handle auth RADIUS USE_EXTERNAL_RADIUS_AUTH
+  S_AUTH_RES,           // outgoing mgmt::auth frame
+  S_ASSOC_REQ,          // assoc req stage
+  S_ASSOC_RESP,         // assoc resp stage
+  S_RADIUS_REQ,         // radius req stage
+  S_RADIUS_RESP,        // radius resp stage
+  S_HANDSHAKE,          // handshake stage
+  S_HANDSHAKE_DONE,     // handshake done stage
+  S_AUTHORIZED,         // sta connected stage
+  S_DEAUTHORIZED,       // sta disconnected stage
+  S_DEAUTH_REQ,         // incoming mgmt:deauth frame
+  S_DEAUTH_RES,         // outgoing mgmt:deauth frame
+  S_DISASSOC,           // outgoing mgmt::disassoc frame
+} wifi_stage_t;
+
+// Макрос для сообщений об успешных операциях (status=0)
+#define WPA_MSG_WIFI_OK(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=0 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
+// Макрос для информационных сообщений (status=1)
+#define WPA_MSG_WIFI_INF(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=1 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
+// Макрос для сообщений об ошибках (status=2)
+#define WPA_MSG_WIFI_ERR(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=2 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
+// Макрос для сообщений с предупреждением (status=3)
+#define WPA_MSG_WIFI_WARN(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
+// Макрос для сообщений с предупреждением (status=3)
+#define WPA_MSG_WIFI_DEBUG(stage, fmt, ...) \
+    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+
+
 
 #endif /* WPA_DEBUG_H */

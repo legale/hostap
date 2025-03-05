@@ -100,8 +100,13 @@ static inline void wpa_auth_set_eapol(struct wpa_authenticator *wpa_auth,
 				      const u8 *addr, wpa_eapol_variable var,
 				      int value)
 {
-	if (wpa_auth->cb->set_eapol)
+	if (wpa_auth->cb->set_eapol){
+		WPA_MSG_WIFI_INF(S_HANDSHAKE, "wpa_auth_set_eapol var=%d val=%d mac=" MACSTR, var, value, MAC2STR(addr));
+		if(var == WPA_EAPOL_authorized && value != 0){
+			WPA_MSG_WIFI_INF(S_HANDSHAKE_DONE, "wpa_auth_set_eapol handshake done var=%d val=%d done mac=" MACSTR, var, value, MAC2STR(addr));
+		}
 		wpa_auth->cb->set_eapol(wpa_auth->cb_ctx, addr, var, value);
+	}
 }
 
 
@@ -3680,6 +3685,8 @@ SM_STATE(WPA_PTK, PTKINITDONE)
 	wpa_auth_vlogger(sm->wpa_auth, sm->addr, LOGGER_INFO,
 			 "pairwise key handshake completed (%s)",
 			 sm->wpa == WPA_VERSION_WPA ? "WPA" : "RSN");
+	WPA_MSG_WIFI_INF(S_HANDSHAKE, "pairwise key handshake completed wpa_version=%d sa=" MACSTR, sm->wpa, MAC2STR(sm->addr));
+			 
 
 #ifdef CONFIG_IEEE80211R_AP
 	wpa_ft_push_pmk_r1(sm->wpa_auth, sm->addr);
@@ -3813,6 +3820,7 @@ SM_STEP(WPA_PTK)
 			SM_ENTER(WPA_PTK, PTKINITNEGOTIATING);
 		break;
 	case WPA_PTK_PTKINITDONE:
+		WPA_MSG_WIFI_INF(S_HANDSHAKE_DONE, "handshake done sa=" MACSTR, MAC2STR(STATE_MACHINE_ADDR));
 		break;
 	}
 }
