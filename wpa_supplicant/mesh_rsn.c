@@ -173,7 +173,7 @@ static int __mesh_rsn_auth_init(struct mesh_rsn *rsn, const u8 *addr,
 	conf.ocv = ocv;
 #endif /* CONFIG_OCV */
 
-	rsn->auth = wpa_init(addr, &conf, &cb, rsn);
+	rsn->auth = wpa_init(NULL, addr, &conf, &cb, rsn);
 	if (rsn->auth == NULL) {
 		wpa_printf(MSG_DEBUG, "AUTH: wpa_init() failed");
 		return -1;
@@ -374,7 +374,7 @@ int mesh_rsn_auth_sae_sta(struct wpa_supplicant *wpa_s,
 	pmksa = wpa_auth_pmksa_get(hapd->wpa_auth, sta->addr, NULL);
 	if (pmksa) {
 		if (!sta->wpa_sm)
-			sta->wpa_sm = wpa_auth_sta_init(hapd->wpa_auth,
+			sta->wpa_sm = wpa_auth_sta_init(hapd, hapd->wpa_auth,
 							sta->addr, NULL);
 		if (!sta->wpa_sm) {
 			wpa_printf(MSG_ERROR,

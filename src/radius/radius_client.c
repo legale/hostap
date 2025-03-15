@@ -12,6 +12,10 @@
 #include "radius.h"
 #include "radius_client.h"
 #include "eloop.h"
+#include "ap/hostapd.h"
+
+static u8 zeromac[ETH_ALEN] = {0};
+
 
 /* Defaults for RADIUS retransmit values (exponential backoff) */
 
@@ -752,7 +756,9 @@ int radius_client_send(struct radius_client_data *radius,
 		char abuf[50];
 		abuf[0] = '\0';
 		hostapd_ip_txt(&conf->auth_server->addr, abuf, sizeof(abuf));
-		WPA_MSG_WIFI_INF(S_RADIUS_REQ, "auth_server_req=%s radius_type=%d sa=" MACSTR, abuf, msg_type, MAC2STR(addr));
+		struct hostapd_data *hapd = (struct hostapd_data *)radius->ctx;
+		u8 *bssid = hapd ? hapd->own_addr : zeromac;
+		WIFIMON_INF(S_RADIUS_REQ, "auth_server_req=%s radius_type=%d mac=" MACSTR " bssid=" MACSTR, abuf, msg_type, MAC2STR(addr), MAC2STR(bssid));
 		
 	}
 
@@ -857,7 +863,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	msghdr.msg_flags = 0;
 	len = recvmsg(sock, &msghdr, MSG_DONTWAIT);
 	if (len < 0) {
-		WPA_MSG_WIFI_ERR(S_RADIUS_RES, "recvmsg[RADIUS]: %d %s", errno, strerror(errno));
+		WIFIMON_ERR(S_RADIUS_RES, "recvmsg[RADIUS]: %d %s", errno, strerror(errno));
 		wpa_printf(MSG_INFO, "recvmsg[RADIUS]: %s", strerror(errno));
 		return;
 	}
@@ -943,14 +949,16 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	} else {
 		strcpy(ip_str, "unknown");
 	}
-
-	WPA_MSG_WIFI_INF(
+	struct hostapd_data *hapd = (struct hostapd_data *)radius->ctx;
+	u8 *bssid = hapd ? hapd->own_addr : zeromac;
+	WIFIMON_INF(
 		S_RADIUS_RES,
-		"found corresponding RADIUS req type=%d id=%d sa_family=%d "
-		"sa=" MACSTR ""
+		"found corresponding RADIUS req type=%d id=%d sa_family=%d"
+		" mac=" MACSTR " bssid=" MACSTR
 		" %s=%s",
 		msg_type, hdr->identifier, safamily,
 		MAC2STR(req->addr),
+		MAC2STR(bssid),
 		msg_type == RADIUS_AUTH ? "auth_server_res" : "acct_server_res", ip_str);
 
 

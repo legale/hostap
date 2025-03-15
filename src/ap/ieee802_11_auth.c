@@ -106,7 +106,7 @@ static void hostapd_acl_query_free(struct hostapd_acl_query_data *query)
 static int hostapd_radius_acl_query(struct hostapd_data *hapd, const u8 *addr,
 				    struct hostapd_acl_query_data *query)
 {
-	WPA_MSG_WIFI_INF(S_RADIUS_REQ, "sa=" MACSTR " query->addr=" MACSTR, MAC2STR(addr), MAC2STR(query->addr));
+	WIFIMON_INF(S_RADIUS_REQ, "mac=" MACSTR " query->addr=" MACSTR, MAC2STR(addr), MAC2STR(query->addr));
 
 	struct radius_msg *msg;
 	char buf[128];

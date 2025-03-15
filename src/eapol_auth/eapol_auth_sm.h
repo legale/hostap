@@ -28,6 +28,7 @@ struct eapol_auth_config {
 	void *ctx;
 };
 
+struct hostapd_data;
 struct eap_user;
 struct eap_server_erp_key;
 
@@ -66,7 +67,7 @@ struct eapol_authenticator * eapol_auth_init(struct eapol_auth_config *conf,
 					     struct eapol_auth_cb *cb);
 void eapol_auth_deinit(struct eapol_authenticator *eapol);
 struct eapol_state_machine *
-eapol_auth_alloc(struct eapol_authenticator *eapol, const u8 *addr,
+eapol_auth_alloc(struct hostapd_data *hapd, struct eapol_authenticator *eapol, const u8 *addr,
 		 int flags, const struct wpabuf *assoc_wps_ie,
 		 const struct wpabuf *assoc_p2p_ie, void *sta_ctx,
 		 const char *identity, const char *radius_cui);

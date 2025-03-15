@@ -11,6 +11,7 @@
 
 #include "common/defs.h"
 #include "radius/radius.h"
+#include "ap/hostapd.h"
 
 /* IEEE Std 802.1X-2004, Ch. 8.2 */
 
@@ -37,6 +38,7 @@ struct eapol_authenticator {
  * struct eapol_state_machine - Per-Supplicant Authenticator state machines
  */
 struct eapol_state_machine {
+	struct hostapd_data *hapd;
 	/* timers */
 	int aWhile;
 	int quietWhile;

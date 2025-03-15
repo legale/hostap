@@ -18,9 +18,12 @@
 #include "eapol_auth_sm.h"
 #include "eapol_auth_sm_i.h"
 
+
 #define STATE_MACHINE_DATA struct eapol_state_machine
 #define STATE_MACHINE_DEBUG_PREFIX "IEEE 802.1X"
 #define STATE_MACHINE_ADDR sm->addr
+#define STATE_MACHINE_HAPD sm->hapd
+static u8 zeromac[ETH_ALEN] = {0};
 
 static const struct eapol_callbacks eapol_cb;
 
@@ -774,7 +777,7 @@ SM_STEP(CTRL_DIR)
 
 
 struct eapol_state_machine *
-eapol_auth_alloc(struct eapol_authenticator *eapol, const u8 *addr,
+eapol_auth_alloc(struct hostapd_data *hapd, struct eapol_authenticator *eapol, const u8 *addr,
 		 int flags, const struct wpabuf *assoc_wps_ie,
 		 const struct wpabuf *assoc_p2p_ie, void *sta_ctx,
 		 const char *identity, const char *radius_cui)
@@ -860,7 +863,8 @@ eapol_auth_alloc(struct eapol_authenticator *eapol, const u8 *addr,
 		return NULL;
 	}
 #endif /* CONFIG_NO_RADIUS */
-
+	
+	sm->hapd = hapd;
 	return sm;
 }
 

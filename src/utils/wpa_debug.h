@@ -374,42 +374,43 @@ int str_to_debug_level(const char *s);
 #define __FILENAME__ (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
 
 typedef enum wifi_stage {
-  S_UNK,                // unknown stage
-  S_AUTH_REQ,           // incoming mgmt::auth frame
-  S_AUTH_HANDLE,        // handle auth
-  S_AUTH_HANDLE_RADIUS, // handle auth RADIUS USE_EXTERNAL_RADIUS_AUTH
-  S_AUTH_RES,           // outgoing mgmt::auth frame
-  S_ASSOC_REQ,          // assoc req stage
-  S_ASSOC_RESP,         // assoc resp stage
-  S_RADIUS_REQ,         // radius req stage
-  S_RADIUS_RESP,        // radius resp stage
-  S_HANDSHAKE,          // handshake stage
-  S_HANDSHAKE_DONE,     // handshake done stage
-  S_AUTHORIZED,         // sta connected stage
-  S_DEAUTHORIZED,       // sta disconnected stage
-  S_DEAUTH_REQ,         // incoming mgmt:deauth frame
-  S_DEAUTH_RES,         // outgoing mgmt:deauth frame
-  S_DISASSOC,           // outgoing mgmt::disassoc frame
+	S_UNK = 0,                // unknown stage                // Неизвестная стадия
+	S_AUTH_REQ = 1,           // incoming mgmt::auth frame    // Входящий запрос аутентификации (кадр mgmt::auth)
+	S_AUTH_HANDLE = 2,        // handle auth                  // Обработка аутентификации
+	S_AUTH_HANDLE_RADIUS = 3, // handle auth RADIUS USE_EXTERNAL_RADIUS_AUTH // Обработка аутентификации через RADIUS
+	S_AUTH_RES = 4,           // outgoing mgmt::auth frame    // Исходящий ответ аутентификации (кадр mgmt::auth)
+	S_ASSOC_REQ = 5,          // incoming mgmt::assoc frame   // Входящий запрос ассоциации (кадр mgmt::assoc)
+	S_ASSOC_RES = 6,          // outgoing mgmt::assoc frame   // Исходящий ответ ассоциации (кадр mgmt::assoc)
+	S_RADIUS_REQ = 7,         // radius req stage             // Стадия запроса RADIUS
+	S_RADIUS_RES = 8,         // radius resp stage            // Стадия ответа RADIUS
+	S_HANDSHAKE = 9,          // handshake stage              // Стадия рукопожатия (handshake)
+	S_HANDSHAKE_DONE = 10,    // handshake done stage         // Рукопожатие завершено
+	S_AUTHORIZED = 11,        // sta connected stage          // Стадия подключения станции (STA авторизована)
+	S_DEAUTHORIZED = 12,      // sta disconnected stage       // Стадия отключения станции (STA деавторизована)
+	S_DEAUTH_REQ = 13,        // incoming mgmt:deauth frame   // Входящий запрос деаутентификации (кадр mgmt::deauth)
+	S_DEAUTH_RES = 14,        // outgoing mgmt:deauth frame   // Исходящий ответ деаутентификации (кадр mgmt::deauth)
+	S_DISASSOC = 15,          // outgoing mgmt::disassoc frame // Исходящий кадр разрыва ассоциации (mgmt::disassoc)
 } wifi_stage_t;
 
+void wpa_msg_glo(int level, const char *fmt, ...);
 // Макрос для сообщений об успешных операциях (status=0)
-#define WPA_MSG_WIFI_OK(stage, fmt, ...) \
+#define WIFIMON_OK(stage, fmt, ...) \
     wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=0 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
 
 // Макрос для информационных сообщений (status=1)
-#define WPA_MSG_WIFI_INF(stage, fmt, ...) \
+#define WIFIMON_INF(stage, fmt, ...) \
     wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=1 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
 
 // Макрос для сообщений об ошибках (status=2)
-#define WPA_MSG_WIFI_ERR(stage, fmt, ...) \
+#define WIFIMON_ERR(stage, fmt, ...) \
     wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=2 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
 
 // Макрос для сообщений с предупреждением (status=3)
-#define WPA_MSG_WIFI_WARN(stage, fmt, ...) \
+#define WIFIMON_WARN(stage, fmt, ...) \
     wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
 
 // Макрос для сообщений с предупреждением (status=3)
-#define WPA_MSG_WIFI_DEBUG(stage, fmt, ...) \
+#define WIFIMON_DEBUG(stage, fmt, ...) \
     wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
 
 

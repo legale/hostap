@@ -255,7 +255,7 @@ static int auth_init(struct wpa *wpa)
 		supp_ie_len = sizeof(ie_rsn);
 	}
 
-	wpa->auth = wpa_auth_sta_init(wpa->auth_group, wpa->supp_addr, NULL);
+	wpa->auth = wpa_auth_sta_init(NULL, wpa->auth_group, wpa->supp_addr, NULL);
 	if (!wpa->auth) {
 		wpa_printf(MSG_DEBUG, "AUTH: wpa_auth_sta_init() failed");
 		return -1;

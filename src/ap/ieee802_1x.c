@@ -113,13 +113,13 @@ void ieee802_1x_set_sta_authorized(struct hostapd_data *hapd,
 		return;
 
 	if (authorized) {
-		if(sta) WPA_MSG_WIFI_INF(0, "sta authorized sa=" MACSTR, MAC2STR(sta->addr));
+		if(sta) WIFIMON_INF(0, "sta authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		ap_sta_set_authorized(hapd, sta, 1);
 		res = hostapd_set_authorized(hapd, sta, 1);
 		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE8021X,
 			       HOSTAPD_LEVEL_DEBUG, "authorizing port");
 	} else {
-		if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
+		if(sta) WIFIMON_INF(0, "sta not authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		ap_sta_set_authorized(hapd, sta, 0);
 		res = hostapd_set_authorized(hapd, sta, 0);
 		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE8021X,
@@ -993,7 +993,7 @@ ieee802_1x_alloc_eapol_sm(struct hostapd_data *hapd, struct sta_info *sta)
 		if (wpa_auth_sta_get_pmksa(sta->wpa_sm))
 			flags |= EAPOL_SM_FROM_PMKSA_CACHE;
 	}
-	return eapol_auth_alloc(hapd->eapol_auth, sta->addr, flags,
+	return eapol_auth_alloc(hapd, hapd->eapol_auth, sta->addr, flags,
 				sta->wps_ie, sta->p2p_ie, sta,
 				sta->identity, sta->radius_cui);
 }

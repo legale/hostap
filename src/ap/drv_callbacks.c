@@ -75,7 +75,7 @@ void hostapd_notify_assoc_fils_finish(struct hostapd_data *hapd,
 				      sta->fils_pending_assoc_is_reassoc,
 				      WLAN_STATUS_SUCCESS,
 				      buf, p - buf);
-	if(sta) WPA_MSG_WIFI_INF(0, "sta authorized sa=" MACSTR, MAC2STR(sta->addr));
+	if(sta) WIFIMON_INF(0, "sta authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	ap_sta_set_authorized(hapd, sta, 1);
 	new_assoc = (sta->flags & WLAN_STA_ASSOC) == 0;
 	sta->flags |= WLAN_STA_AUTH | WLAN_STA_ASSOC;
@@ -347,7 +347,7 @@ int hostapd_notif_assoc(struct hostapd_data *hapd, const u8 *addr,
 #endif /* CONFIG_WPS */
 
 		if (sta->wpa_sm == NULL)
-			sta->wpa_sm = wpa_auth_sta_init(hapd->wpa_auth,
+			sta->wpa_sm = wpa_auth_sta_init(hapd, hapd->wpa_auth,
 							sta->addr,
 							p2p_dev_addr);
 		if (sta->wpa_sm == NULL) {
@@ -510,7 +510,7 @@ int hostapd_notif_assoc(struct hostapd_data *hapd, const u8 *addr,
 
 		wpa_printf(MSG_DEBUG, "HS 2.0: OSEN association");
 		if (sta->wpa_sm == NULL)
-			sta->wpa_sm = wpa_auth_sta_init(hapd->wpa_auth,
+			sta->wpa_sm = wpa_auth_sta_init(hapd, hapd->wpa_auth,
 							sta->addr, NULL);
 		if (sta->wpa_sm == NULL) {
 			wpa_printf(MSG_WARNING,
@@ -692,7 +692,7 @@ skip_wpa_check:
 	    sta->auth_alg == WLAN_AUTH_FILS_SK ||
 	    sta->auth_alg == WLAN_AUTH_FILS_SK_PFS ||
 	    sta->auth_alg == WLAN_AUTH_FILS_PK){
-		if(sta) WPA_MSG_WIFI_INF(0, "sta authorized sa=" MACSTR, MAC2STR(sta->addr));
+		if(sta) WIFIMON_INF(0, "sta authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		ap_sta_set_authorized(hapd, sta, 1);
 	}
 #else /* CONFIG_IEEE80211R_AP || CONFIG_FILS */
@@ -769,7 +769,7 @@ void hostapd_notif_disassoc(struct hostapd_data *hapd, const u8 *addr)
 			   MACSTR, MAC2STR(addr));
 		return;
 	}
-	if(sta) WPA_MSG_WIFI_INF(0, "sta not authorized sa=" MACSTR, MAC2STR(sta->addr));
+	if(sta) WIFIMON_INF(0, "sta not authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	sta->flags &= ~(WLAN_STA_AUTH | WLAN_STA_ASSOC);
 	hostapd_set_sta_flags(hapd, sta);
@@ -1252,7 +1252,7 @@ static void hostapd_notif_auth(struct hostapd_data *hapd,
 	if (rx_auth->auth_type == WLAN_AUTH_FT && hapd->wpa_auth) {
 		sta->auth_alg = WLAN_AUTH_FT;
 		if (sta->wpa_sm == NULL)
-			sta->wpa_sm = wpa_auth_sta_init(hapd->wpa_auth,
+			sta->wpa_sm = wpa_auth_sta_init(hapd, hapd->wpa_auth,
 							sta->addr, NULL);
 		if (sta->wpa_sm == NULL) {
 			wpa_printf(MSG_DEBUG,

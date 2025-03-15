@@ -347,7 +347,7 @@ struct wpa_auth_callbacks {
 #endif /* CONFIG_MESH */
 };
 
-struct wpa_authenticator * wpa_init(const u8 *addr,
+struct wpa_authenticator * wpa_init(struct hostapd_data *hapd, const u8 *addr,
 				    struct wpa_auth_config *conf,
 				    const struct wpa_auth_callbacks *cb,
 				    void *cb_ctx);
@@ -378,7 +378,7 @@ int wpa_auth_uses_mfp(struct wpa_state_machine *sm);
 void wpa_auth_set_ocv(struct wpa_state_machine *sm, int ocv);
 int wpa_auth_uses_ocv(struct wpa_state_machine *sm);
 struct wpa_state_machine *
-wpa_auth_sta_init(struct wpa_authenticator *wpa_auth, const u8 *addr,
+wpa_auth_sta_init(struct hostapd_data *hapd, struct wpa_authenticator *wpa_auth, const u8 *addr,
 		  const u8 *p2p_dev_addr);
 int wpa_auth_sta_associated(struct wpa_authenticator *wpa_auth,
 			    struct wpa_state_machine *sm);

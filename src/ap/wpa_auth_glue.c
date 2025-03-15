@@ -242,10 +242,9 @@ static void hostapd_wpa_auth_logger(void *ctx, const u8 *addr,
 }
 
 
-static void hostapd_wpa_auth_disconnect(void *ctx, const u8 *addr,
-					u16 reason)
+static void hostapd_wpa_auth_disconnect(void *ctx, const u8 *addr, u16 reason)
 {
-	WPA_MSG_WIFI_ERR(S_HANDSHAKE, "authenticator requests disconnect sa=" MACSTR, MAC2STR(addr));
+	WIFIMON_ERR(S_HANDSHAKE, "authenticator requests disconnect sa=" MACSTR, MAC2STR(addr));
 	
 	struct hostapd_data *hapd = ctx;
 	wpa_printf(MSG_DEBUG, "%s: WPA authenticator requests disconnect: "
@@ -257,7 +256,7 @@ static void hostapd_wpa_auth_disconnect(void *ctx, const u8 *addr,
 
 static int hostapd_wpa_auth_mic_failure_report(void *ctx, const u8 *addr)
 {
-	WPA_MSG_WIFI_ERR(S_HANDSHAKE, "message integrity check failed sa=" MACSTR, MAC2STR(addr));
+	WIFIMON_ERR(S_HANDSHAKE, "message integrity check failed sa=" MACSTR, MAC2STR(addr));
 	
 	struct hostapd_data *hapd = ctx;
 	return michael_mic_failure(hapd, addr, 0);
@@ -266,7 +265,7 @@ static int hostapd_wpa_auth_mic_failure_report(void *ctx, const u8 *addr)
 
 static void hostapd_wpa_auth_psk_failure_report(void *ctx, const u8 *addr)
 {
-	WPA_MSG_WIFI_ERR(S_HANDSHAKE, AP_STA_POSSIBLE_PSK_MISMATCH " sa=" MACSTR, MAC2STR(addr));
+	WIFIMON_ERR(S_HANDSHAKE, AP_STA_POSSIBLE_PSK_MISMATCH " sa=" MACSTR, MAC2STR(addr));
 
 	struct hostapd_data *hapd = ctx;
 	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POSSIBLE_PSK_MISMATCH MACSTR,
@@ -1076,7 +1075,7 @@ hostapd_wpa_auth_add_sta(void *ctx, const u8 *sta_addr)
 		return sta->wpa_sm;
 	}
 
-	sta->wpa_sm = wpa_auth_sta_init(hapd->wpa_auth, sta->addr, NULL);
+	sta->wpa_sm = wpa_auth_sta_init(hapd, hapd->wpa_auth, sta->addr, NULL);
 	if (sta->wpa_sm == NULL) {
 		ap_free_sta(hapd, sta);
 		return NULL;
@@ -1534,7 +1533,7 @@ int hostapd_setup_wpa(struct hostapd_data *hapd)
 	_conf.prot_range_neg =
 		!!(hapd->iface->drv_flags2 & WPA_DRIVER_FLAGS2_PROT_RANGE_NEG);
 
-	hapd->wpa_auth = wpa_init(hapd->own_addr, &_conf, &cb, hapd);
+	hapd->wpa_auth = wpa_init(hapd, hapd->own_addr, &_conf, &cb, hapd);
 	if (hapd->wpa_auth == NULL) {
 		wpa_printf(MSG_ERROR, "WPA initialization failed.");
 		return -1;
