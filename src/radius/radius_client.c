@@ -752,14 +752,18 @@ int radius_client_send(struct radius_client_data *radius,
 		       const u8 *addr)
 {
 	struct hostapd_radius_servers *conf = radius->conf;
-	if(addr && msg_type == RADIUS_AUTH){
+	struct hostapd_data *hapd = (struct hostapd_data *)radius->ctx;
+	u8 *bssid = hapd ? hapd->own_addr : zeromac;
+	
+	if(addr){
 		char abuf[50];
 		abuf[0] = '\0';
-		hostapd_ip_txt(&conf->auth_server->addr, abuf, sizeof(abuf));
-		struct hostapd_data *hapd = (struct hostapd_data *)radius->ctx;
-		u8 *bssid = hapd ? hapd->own_addr : zeromac;
-		WIFIMON_INF(S_RADIUS_REQ, "auth_server_req=%s radius_type=%d mac=" MACSTR " bssid=" MACSTR, abuf, msg_type, MAC2STR(addr), MAC2STR(bssid));
-		
+		if(msg_type == RADIUS_AUTH){
+			hostapd_ip_txt(&conf->auth_server->addr, abuf, sizeof(abuf));
+		} else if (msg_type == RADIUS_ACCT){
+			hostapd_ip_txt(&conf->acct_server->addr, abuf, sizeof(abuf));
+		}
+		WIFIMON_INF(S_RADIUS_REQ, "radius send radius_server=%s radius_type=%d mac=" MACSTR " bssid=" MACSTR, abuf, msg_type, MAC2STR(addr), MAC2STR(bssid));
 	}
 
 	const u8 *shared_secret;
@@ -846,6 +850,8 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	struct hostapd_radius_server *rconf;
 	int invalid_authenticator = 0;
 
+	struct hostapd_data *hapd = (struct hostapd_data *)radius->ctx;
+
 	if (msg_type == RADIUS_ACCT) {
 		handlers = radius->acct_handlers;
 		num_handlers = radius->num_acct_handlers;
@@ -863,7 +869,6 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	msghdr.msg_flags = 0;
 	len = recvmsg(sock, &msghdr, MSG_DONTWAIT);
 	if (len < 0) {
-		WIFIMON_ERR(S_RADIUS_RES, "recvmsg[RADIUS]: %d %s", errno, strerror(errno));
 		wpa_printf(MSG_INFO, "recvmsg[RADIUS]: %s", strerror(errno));
 		return;
 	}
@@ -949,18 +954,32 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	} else {
 		strcpy(ip_str, "unknown");
 	}
-	struct hostapd_data *hapd = (struct hostapd_data *)radius->ctx;
+
 	u8 *bssid = hapd ? hapd->own_addr : zeromac;
-	WIFIMON_INF(
+	int wifimon_status = 0;
+	switch(hdr->code){
+		case RADIUS_CODE_ACCESS_ACCEPT:
+		wifimon_status = WIFIMON_OK;
+		break;
+		
+		case RADIUS_CODE_ACCESS_REJECT:
+		wifimon_status = WIFIMON_ERR;
+		break;
+		
+		default:
+		wifimon_status = WIFIMON_INF;
+		break;
+	}
+	
+	WIFIMON_MSG(wifimon_status,
 		S_RADIUS_RES,
-		"found corresponding RADIUS req type=%d id=%d sa_family=%d"
+		"radius recv and found corresponding radius req radius_type=%d id=%d sa_family=%d"
 		" mac=" MACSTR " bssid=" MACSTR
-		" %s=%s",
+		" radius_server=%s radius_code=%u",
 		msg_type, hdr->identifier, safamily,
 		MAC2STR(req->addr),
 		MAC2STR(bssid),
-		msg_type == RADIUS_AUTH ? "auth_server_res" : "acct_server_res", ip_str);
-
+		ip_str, hdr->code);
 
         os_get_reltime(&now);
 	roundtrip = (now.sec - req->last_attempt.sec) * 100 +

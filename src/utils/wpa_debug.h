@@ -389,30 +389,27 @@ typedef enum wifi_stage {
 	S_DEAUTHORIZED = 12,      // sta disconnected stage       // Стадия отключения станции (STA деавторизована)
 	S_DEAUTH_REQ = 13,        // incoming mgmt:deauth frame   // Входящий запрос деаутентификации (кадр mgmt::deauth)
 	S_DEAUTH_RES = 14,        // outgoing mgmt:deauth frame   // Исходящий ответ деаутентификации (кадр mgmt::deauth)
-	S_DISASSOC = 15,          // outgoing mgmt::disassoc frame // Исходящий кадр разрыва ассоциации (mgmt::disassoc)
+	S_DISASSOC_REQ = 15,      // incoming mgmt::disassoc frame // Входящий кадр разрыва ассоциации (mgmt::disassoc)
+	S_DISASSOC_RES = 16,      // outgoing mgmt::disassoc frame // Исходящий кадр разрыва ассоциации (mgmt::disassoc)
 } wifi_stage_t;
 
+typedef enum wifimon_status {
+	WIFIMON_OK = 0,
+	WIFIMON_INF = 1,
+	WIFIMON_ERR = 2,
+	WIFIMON_WARN = 3,
+} wifimon_status_t;
+
 void wpa_msg_glo(int level, const char *fmt, ...);
-// Макрос для сообщений об успешных операциях (status=0)
-#define WIFIMON_OK(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=0 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
 
-// Макрос для информационных сообщений (status=1)
-#define WIFIMON_INF(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=1 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+// Макрос для сообщений wifimon с разным статусом
+#define WIFIMON_MSG(wifimon_status, stage, fmt, ...) \
+	wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: wifimon_status=%d stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, wifimon_status, stage, ##__VA_ARGS__)
 
-// Макрос для сообщений об ошибках (status=2)
-#define WIFIMON_ERR(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=2 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
-
-// Макрос для сообщений с предупреждением (status=3)
-#define WIFIMON_WARN(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
-
-// Макрос для сообщений с предупреждением (status=3)
-#define WIFIMON_DEBUG(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
-
-
+#define WIFIMON_OK(stage, fmt, ...) WIFIMON_MSG(WIFIMON_OK, stage, fmt, ##__VA_ARGS__)
+#define WIFIMON_INF(stage, fmt, ...) WIFIMON_MSG(WIFIMON_INF, stage, fmt, ##__VA_ARGS__)
+#define WIFIMON_ERR(stage, fmt, ...) WIFIMON_MSG(WIFIMON_ERR, stage, fmt, ##__VA_ARGS__)
+#define WIFIMON_WARN(stage, fmt, ...) WIFIMON_MSG(WIFIMON_WARN, stage, fmt, ##__VA_ARGS__)
+#define WIFIMON_DEBUG(stage, fmt, ...) WIFIMON_MSG(WIFIMON_WARN, stage, fmt, ##__VA_ARGS__)
 
 #endif /* WPA_DEBUG_H */
