@@ -394,9 +394,9 @@ static int send_auth_reply(struct hostapd_data *hapd, struct sta_info *sta,
 	if (ies && ies_len)
 		os_memcpy(reply->u.auth.variable, ies, ies_len);
 	if(!resp){
-		WIFIMON_OK(S_AUTH_RES, "auth success resp=%d bssid=" MACSTR " mac=" MACSTR, resp, MAC2STR(reply->sa), MAC2STR(reply->da));
+		WIFIMON_OK(S_AUTH_RES, "auth success status_code=%d resp=%d bssid=" MACSTR " mac=" MACSTR, host_to_le16(resp), resp, MAC2STR(reply->sa), MAC2STR(reply->da));
 	} else {
-		WIFIMON_ERR(S_AUTH_RES, "auth failed resp=%d bssid=" MACSTR " mac=" MACSTR, resp, MAC2STR(reply->sa), MAC2STR(reply->da));
+		WIFIMON_ERR(S_AUTH_RES, "auth failed status_code=%d resp=%d bssid=" MACSTR " mac=" MACSTR, host_to_le16(resp), resp, MAC2STR(reply->sa), MAC2STR(reply->da));
 	}
 	wpa_printf(MSG_DEBUG, "authentication reply: STA=" MACSTR
 		   " auth_alg=%d auth_transaction=%d resp=%d (IE len=%lu) (dbg=%s)",
