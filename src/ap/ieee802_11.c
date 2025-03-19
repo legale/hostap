@@ -1572,13 +1572,17 @@ reply:
 	}
 
 remove_sta:
-	WIFIMON_ERR(S_HANDSHAKE_DONE, "remove_sta auth_transaction=%u resp=%d mac=" MACSTR " bssid=" MACSTR, auth_transaction, resp, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
-	if (auth_transaction == 1)
+	WIFIMON_INF(S_HANDSHAKE, "auth_transaction=%u resp=%d mac=" MACSTR " bssid=" MACSTR, auth_transaction, resp, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
+
+	if (auth_transaction == 1){
 		success_status = sae_status_success(hapd, status_code);
-	else
+	} else {
 		success_status = status_code == WLAN_STATUS_SUCCESS;
+	}
+
 	if (!sta_removed && sta->added_unassoc &&
-	    (resp != WLAN_STATUS_SUCCESS || !success_status)) {
+	(resp != WLAN_STATUS_SUCCESS || !success_status)) {
+		WIFIMON_ERR(S_HANDSHAKE_DONE, "sta removed auth_transaction=%u resp=%d mac=" MACSTR " bssid=" MACSTR, auth_transaction, resp, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 		hostapd_drv_sta_remove(hapd, sta->addr);
 		sta->added_unassoc = 0;
 	}
@@ -6661,12 +6665,20 @@ void ieee802_11_mgmt_cb(struct hostapd_data *hapd, const u8 *buf, size_t len,
 
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WIFIMON_INF(S_AUTH_RES, "mgmt::auth status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.auth.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		if(le_to_host16(mgmt->u.auth.status_code)){
+		WIFIMON_MSG(WIFIMON_ERR, S_AUTH_RES, "mgmt::auth failed status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.auth.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		} else {
+		WIFIMON_MSG(WIFIMON_OK, S_AUTH_RES, "mgmt::auth status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.auth.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		}
 		wpa_printf(MSG_DEBUG, "mgmt::auth cb");
 		handle_auth_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_ASSOC_RESP:
-		WIFIMON_INF(S_ASSOC_RES, "mgmt::assoc_resp status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.assoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		if(le_to_host16(mgmt->u.assoc_resp.status_code)){
+			WIFIMON_MSG(WIFIMON_ERR, S_ASSOC_RES, "mgmt::assoc_resp failed status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.assoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		} else {
+			WIFIMON_MSG(WIFIMON_OK, S_ASSOC_RES, "mgmt::assoc_resp status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.assoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		}
 		wpa_printf(MSG_DEBUG, "mgmt::assoc_resp cb");
 		handle_assoc_cb(hapd, mgmt, len, 0, ok);
 		break;
