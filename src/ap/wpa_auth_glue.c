@@ -244,9 +244,8 @@ static void hostapd_wpa_auth_logger(void *ctx, const u8 *addr,
 
 static void hostapd_wpa_auth_disconnect(void *ctx, const u8 *addr, u16 reason)
 {
-	WIFIMON_ERR(S_HANDSHAKE, "authenticator requests disconnect sa=" MACSTR, MAC2STR(addr));
-	
 	struct hostapd_data *hapd = ctx;
+	WIFIMON_ERR(S_HANDSHAKE, "authenticator requests disconnect mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
 	wpa_printf(MSG_DEBUG, "%s: WPA authenticator requests disconnect: "
 		   "STA " MACSTR " reason %d",
 		   __func__, MAC2STR(addr), reason);
@@ -256,18 +255,16 @@ static void hostapd_wpa_auth_disconnect(void *ctx, const u8 *addr, u16 reason)
 
 static int hostapd_wpa_auth_mic_failure_report(void *ctx, const u8 *addr)
 {
-	WIFIMON_ERR(S_HANDSHAKE, "message integrity check failed sa=" MACSTR, MAC2STR(addr));
-	
 	struct hostapd_data *hapd = ctx;
+	WIFIMON_ERR(S_HANDSHAKE, "message integrity check failed mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
 	return michael_mic_failure(hapd, addr, 0);
 }
 
 
 static void hostapd_wpa_auth_psk_failure_report(void *ctx, const u8 *addr)
 {
-	WIFIMON_ERR(S_HANDSHAKE, AP_STA_POSSIBLE_PSK_MISMATCH " sa=" MACSTR, MAC2STR(addr));
-
 	struct hostapd_data *hapd = ctx;
+	WIFIMON_ERR(S_HANDSHAKE, AP_STA_POSSIBLE_PSK_MISMATCH " mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
 	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POSSIBLE_PSK_MISMATCH MACSTR,
 		MAC2STR(addr));
 }
