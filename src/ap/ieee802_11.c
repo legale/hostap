@@ -6141,24 +6141,19 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	stype = WLAN_FC_GET_STYPE(fc);
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WIFIMON_INF(S_AUTH_REQ, "frame=mgmt::auth_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d status_code=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.auth.status_code));
+		WIFIMON_INF(S_AUTH_REQ, "frame=mgmt::auth_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d auth_alg=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.auth.auth_alg));
 		break;
 	case WLAN_FC_STYPE_ASSOC_REQ:
 		WIFIMON_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.assoc_req.capab_info));
 		break;
-	case WLAN_FC_STYPE_ASSOC_RESP:
-		break;
+	case WLAN_FC_STYPE_ASSOC_RESP: break;
 	case WLAN_FC_STYPE_REASSOC_REQ:
 		WIFIMON_INF(S_ASSOC_REQ, "frame=mgmt::reassoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.reassoc_req.capab_info));
 		break;
-	case WLAN_FC_STYPE_REASSOC_RESP:
-		break;
-	case WLAN_FC_STYPE_PROBE_REQ:
-		break;
-	case WLAN_FC_STYPE_PROBE_RESP:
-		break;
-	case WLAN_FC_STYPE_BEACON:
-		break;
+	case WLAN_FC_STYPE_REASSOC_RESP: break;
+	case WLAN_FC_STYPE_PROBE_REQ: break;
+	case WLAN_FC_STYPE_PROBE_RESP: break;
+	case WLAN_FC_STYPE_BEACON: break;
 	case WLAN_FC_STYPE_ATIM:
 		// WIFIMON_INF(S_UNK, "frame=mgmt::atim rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype);
 		break;
@@ -6308,7 +6303,8 @@ static void handle_auth_cb(struct hostapd_data *hapd,
 	auth_alg = le_to_host16(mgmt->u.auth.auth_alg);
 	auth_transaction = le_to_host16(mgmt->u.auth.auth_transaction);
 	status_code = le_to_host16(mgmt->u.auth.status_code);
-	WIFIMON_INF(S_AUTH_HANDLE, "auth_alg=%u auth_transaction=%u status_code=%d ok=%d mac=" MACSTR " bssid=" MACSTR, auth_alg, auth_transaction, status_code, ok, MAC2STR(mgmt->da), MAC2STR(mgmt->bssid));
+	
+	WIFIMON_MSG(status_code ? WIFIMON_ERR : WIFIMON_INF, S_AUTH_HANDLE, "auth_alg=%u auth_transaction=%u status_code=%d ok=%d mac=" MACSTR " bssid=" MACSTR, auth_alg, auth_transaction, status_code, ok, MAC2STR(mgmt->da), MAC2STR(mgmt->bssid));
 
 	if (!ok) {
 		hostapd_logger(hapd, mgmt->da, HOSTAPD_MODULE_IEEE80211,
