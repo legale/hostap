@@ -374,23 +374,27 @@ int str_to_debug_level(const char *s);
 #define __FILENAME__ (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
 
 typedef enum wifi_stage {
-	S_UNK = 0,                // unknown stage                // Неизвестная стадия
-	S_AUTH_REQ = 1,           // incoming mgmt::auth frame    // Входящий запрос аутентификации (кадр mgmt::auth)
-	S_AUTH_HANDLE = 2,        // handle auth                  // Обработка аутентификации
-	S_AUTH_HANDLE_RADIUS = 3, // handle auth RADIUS USE_EXTERNAL_RADIUS_AUTH // Обработка аутентификации через RADIUS
-	S_AUTH_RES = 4,           // outgoing mgmt::auth frame    // Исходящий ответ аутентификации (кадр mgmt::auth)
-	S_ASSOC_REQ = 5,          // incoming mgmt::assoc frame   // Входящий запрос ассоциации (кадр mgmt::assoc)
-	S_ASSOC_RES = 6,          // outgoing mgmt::assoc frame   // Исходящий ответ ассоциации (кадр mgmt::assoc)
-	S_RADIUS_REQ = 7,         // radius req stage             // Стадия запроса RADIUS
-	S_RADIUS_RES = 8,         // radius resp stage            // Стадия ответа RADIUS
-	S_HANDSHAKE = 9,          // handshake stage              // Стадия рукопожатия (handshake)
-	S_HANDSHAKE_DONE = 10,    // handshake done stage         // Рукопожатие завершено
-	S_AUTHORIZED = 11,        // sta connected stage          // Стадия подключения станции (STA авторизована)
-	S_DEAUTHORIZED = 12,      // sta disconnected stage       // Стадия отключения станции (STA деавторизована)
-	S_DEAUTH_REQ = 13,        // incoming mgmt:deauth frame   // Входящий запрос деаутентификации (кадр mgmt::deauth)
-	S_DEAUTH_RES = 14,        // outgoing mgmt:deauth frame   // Исходящий ответ деаутентификации (кадр mgmt::deauth)
-	S_DISASSOC_REQ = 15,      // incoming mgmt::disassoc frame // Входящий кадр разрыва ассоциации (mgmt::disassoc)
-	S_DISASSOC_RES = 16,      // outgoing mgmt::disassoc frame // Исходящий кадр разрыва ассоциации (mgmt::disassoc)
+	S_UNK = 0,                // unknown stage
+	S_AUTH_REQ = 1,           // incoming mgmt::auth frame
+	S_AUTH_HANDLE = 2,        // handle auth
+	S_AUTH_HANDLE_RADIUS = 3, // handle auth RADIUS USE_EXTERNAL_RADIUS_AUTH
+	S_AUTH_RES = 4,           // outgoing mgmt::auth frame
+	S_ASSOC_REQ = 5,          // incoming mgmt::assoc frame
+	S_ASSOC_RES = 6,          // outgoing mgmt::assoc frame
+	S_RADIUS_AUTH_REQ = 7,    // radius req stage
+	S_RADIUS_AUTH_RES = 8,    // radius resp stage
+	S_HANDSHAKE = 9,          // handshake stage
+	S_HANDSHAKE_DONE = 10,    // handshake done stage
+	S_AUTHORIZED = 11,        // sta connected stage
+	S_DEAUTHORIZED = 12,      // sta disconnected stage
+	S_DEAUTH_REQ = 13,        // incoming mgmt:deauth frame
+	S_DEAUTH_RES = 14,        // outgoing mgmt:deauth frame
+	S_DISASSOC_REQ = 15,      // incoming mgmt::disassoc frame
+	S_DISASSOC_RES = 16,      // outgoing mgmt::disassoc frame
+	S_RADIUS_ACCT_REQ = 17,   // radius req acct stage
+	S_RADIUS_ACCT_RES = 18,   // radius resp acct stage
+	S_REASSOC_REQ = 19,       // incoming mgmt::reassoc frame
+	S_REASSOC_RES = 20,       // outgoing mgmt::reassoc frame
 } wifi_stage_t;
 
 typedef enum wifimon_status {

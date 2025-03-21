@@ -6148,7 +6148,7 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		break;
 	case WLAN_FC_STYPE_ASSOC_RESP: break;
 	case WLAN_FC_STYPE_REASSOC_REQ:
-		WIFIMON_INF(S_ASSOC_REQ, "frame=mgmt::reassoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.reassoc_req.capab_info));
+		WIFIMON_INF(S_REASSOC_REQ, "frame=mgmt::reassoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.reassoc_req.capab_info));
 		break;
 	case WLAN_FC_STYPE_REASSOC_RESP: break;
 	case WLAN_FC_STYPE_PROBE_REQ: break;
@@ -6679,7 +6679,11 @@ void ieee802_11_mgmt_cb(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		handle_assoc_cb(hapd, mgmt, len, 0, ok);
 		break;
 	case WLAN_FC_STYPE_REASSOC_RESP:
-		WIFIMON_INF(S_ASSOC_RES, "mgmt::reassoc_resp status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.reassoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		if(le_to_host16(mgmt->u.reassoc_resp.status_code)){
+			WIFIMON_MSG(WIFIMON_ERR, S_ASSOC_RES, "mgmt::reassoc_resp failed status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.reassoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		} else {
+			WIFIMON_MSG(WIFIMON_OK, S_ASSOC_RES, "mgmt::reassoc_resp status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.reassoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		}
 		wpa_printf(MSG_DEBUG, "mgmt::reassoc_resp cb");
 		handle_assoc_cb(hapd, mgmt, len, 1, ok);
 		break;
