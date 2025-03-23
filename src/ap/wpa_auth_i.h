@@ -17,6 +17,7 @@
 struct wpa_group;
 
 struct wpa_state_machine {
+	struct hostapd_data *hapd;
 	struct wpa_authenticator *wpa_auth;
 	struct wpa_group *group;
 
@@ -239,6 +240,7 @@ struct wpa_ft_pmk_cache;
 
 /* per authenticator data */
 struct wpa_authenticator {
+	struct hostapd_data *hapd;
 	struct wpa_group *group;
 
 	unsigned int dot11RSNAStatsTKIPRemoteMICFailures;

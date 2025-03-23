@@ -56,7 +56,6 @@ struct hostapd_acl_query_data {
 #ifndef CONFIG_NO_RADIUS
 static void hostapd_acl_cache_free_entry(struct hostapd_cached_radius_acl *e)
 {
-	WPA_MSG_WIFI_INF(0, "");
 	os_free(e->info.identity);
 	os_free(e->info.radius_cui);
 	hostapd_free_psk_list(e->info.psk);
@@ -66,7 +65,6 @@ static void hostapd_acl_cache_free_entry(struct hostapd_cached_radius_acl *e)
 
 static void hostapd_acl_cache_free(struct hostapd_cached_radius_acl *acl_cache)
 {
-	WPA_MSG_WIFI_INF(0, "");
 	struct hostapd_cached_radius_acl *prev;
 
 	while (acl_cache) {
@@ -80,7 +78,6 @@ static void hostapd_acl_cache_free(struct hostapd_cached_radius_acl *acl_cache)
 static int hostapd_acl_cache_get(struct hostapd_data *hapd, const u8 *addr,
 				 struct radius_sta *out)
 {
-	WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "mac=" MACSTR, MAC2STR(addr));
 
 	struct hostapd_cached_radius_acl *entry;
 	struct os_reltime now;
@@ -92,14 +89,12 @@ static int hostapd_acl_cache_get(struct hostapd_data *hapd, const u8 *addr,
 			continue;
 
 		if (os_reltime_expired(&now, &entry->timestamp, RADIUS_ACL_TIMEOUT)){
-			WPA_MSG_WIFI_ERR(S_AUTH_HANDLE, "mac=" MACSTR " cache entry has expired", MAC2STR(addr));
 			return -1; /* entry has expired */
 		}
 		*out = entry->info;
 		return entry->accepted;
 	}
 
-	WPA_MSG_WIFI_ERR(S_AUTH_HANDLE, "mac=" MACSTR " cache entry not found", MAC2STR(addr));
 	return -1;
 }
 #endif /* CONFIG_NO_RADIUS */
@@ -120,9 +115,8 @@ static void hostapd_acl_query_free(struct hostapd_acl_query_data *query)
 static int hostapd_radius_acl_query(struct hostapd_data *hapd, const u8 *addr,
 				    struct hostapd_acl_query_data *query)
 {
-	WPA_MSG_WIFI_INF(S_RADIUS_REQ, "sa=" MACSTR " query->addr=" MACSTR, MAC2STR(addr), MAC2STR(query->addr));
+	WIFIMON_INF(S_AUTH_HANDLE_RADIUS, "mac=" MACSTR " query->addr=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(query->addr), MAC2STR(hapd->own_addr));
 
-	// WPA_MSG_WIFI_INF(0, "");
 	struct radius_msg *msg;
 	char buf[128];
 
@@ -160,7 +154,6 @@ static int hostapd_radius_acl_query(struct hostapd_data *hapd, const u8 *addr,
 
 	os_snprintf(buf, sizeof(buf), RADIUS_802_1X_ADDR_FORMAT,
 		    MAC2STR(addr));
-	WPA_MSG_WIFI_INF(S_RADIUS_REQ, "RADIUS_ATTR_CALLING_STATION_ID sa=" MACSTR, MAC2STR(addr));
 	if (!radius_msg_add_attr(msg, RADIUS_ATTR_CALLING_STATION_ID,
 				 (u8 *) buf, os_strlen(buf))) {
 		wpa_printf(MSG_DEBUG, "Could not add Calling-Station-Id");
@@ -260,7 +253,6 @@ int hostapd_allowed_address(struct hostapd_data *hapd, const u8 *addr,
 			    const u8 *msg, size_t len, struct radius_sta *out,
 			    int is_probe_req)
 {
-	// WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "mac=" MACSTR, MAC2STR(addr));
 	int res;
 
 	os_memset(out, 0, sizeof(*out));
