@@ -15,6 +15,7 @@
 #include "common/ieee802_11_defs.h"
 
 struct vlan_description;
+struct hostapd_data;
 
 #define MAX_OWN_IE_OVERRIDE 256
 

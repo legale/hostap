@@ -18,6 +18,8 @@
 #include "eapol_auth_sm.h"
 #include "eapol_auth_sm_i.h"
 
+#include "ap/hostapd.h"
+
 
 #define STATE_MACHINE_DATA struct eapol_state_machine
 #define STATE_MACHINE_DEBUG_PREFIX "IEEE 802.1X"

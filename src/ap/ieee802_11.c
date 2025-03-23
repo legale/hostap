@@ -3847,6 +3847,7 @@ static void handle_auth(struct hostapd_data *hapd,
 #ifdef CONFIG_FILS
 	case WLAN_AUTH_FILS_SK:
 	case WLAN_AUTH_FILS_SK_PFS:
+		WIFIMON_INF(S_HANDSHAKE, "handle_auth_fils auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		handle_auth_fils(hapd, sta, mgmt->u.auth.variable,
 				 len - IEEE80211_HDRLEN - sizeof(mgmt->u.auth),
 				 auth_alg, auth_transaction, status_code,
