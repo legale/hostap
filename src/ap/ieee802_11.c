@@ -449,7 +449,11 @@ static int send_auth_reply(struct hostapd_data *hapd, struct sta_info *sta,
 
 	if (ies && ies_len)
 		os_memcpy(reply->u.auth.variable, ies, ies_len);
-
+	if(!resp){
+		WIFIMON_OK(S_AUTH_RES, "auth success status_code=%d resp=%d bssid=" MACSTR " mac=" MACSTR, host_to_le16(resp), resp, MAC2STR(reply->sa), MAC2STR(reply->da));
+	} else {
+		WIFIMON_ERR(S_AUTH_RES, "auth failed status_code=%d resp=%d bssid=" MACSTR " mac=" MACSTR, host_to_le16(resp), resp, MAC2STR(reply->sa), MAC2STR(reply->da));
+	}
 #ifdef CONFIG_IEEE80211BE
 	if (ml_resp)
 		os_memcpy(reply->u.auth.variable + ies_len,
@@ -1622,6 +1626,11 @@ static void handle_auth_sae(struct hostapd_data *hapd, struct sta_info *sta,
 	}
 
 reply:
+	if(resp == WLAN_STATUS_SUCCESS && auth_transaction == 2){
+		WIFIMON_OK(S_HANDSHAKE_DONE, "auth_transaction=%u resp=%d mac=" MACSTR " bssid=" MACSTR, auth_transaction, resp, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
+	} else {
+		WIFIMON_INF(S_HANDSHAKE, "auth_transaction=%u resp=%d mac=" MACSTR " bssid=" MACSTR, auth_transaction, resp, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
+	}
 	if (!sta_removed && resp != WLAN_STATUS_SUCCESS) {
 		pos = mgmt->u.auth.variable;
 		end = ((const u8 *) mgmt) + len;
@@ -1649,12 +1658,14 @@ reply:
 	}
 
 remove_sta:
+	WIFIMON_INF(S_HANDSHAKE, "auth_transaction=%u resp=%d mac=" MACSTR " bssid=" MACSTR, auth_transaction, resp, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 	if (auth_transaction == 1)
 		success_status = sae_status_success(hapd, status_code);
 	else
 		success_status = status_code == WLAN_STATUS_SUCCESS;
 	if (!sta_removed && sta->added_unassoc &&
 	    (resp != WLAN_STATUS_SUCCESS || !success_status)) {
+		WIFIMON_ERR(S_HANDSHAKE_DONE, "sta removed auth_transaction=%u resp=%d mac=" MACSTR " bssid=" MACSTR, auth_transaction, resp, MAC2STR(mgmt->sa), MAC2STR(mgmt->da));
 		hostapd_drv_sta_remove(hapd, sta->addr);
 		sta->added_unassoc = 0;
 	}
@@ -2357,7 +2368,6 @@ static int ieee802_11_allowed_address(struct hostapd_data *hapd, const u8 *addr,
 				      const u8 *msg, size_t len,
 				      struct radius_sta *info)
 {
-	WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "sa=" MACSTR, MAC2STR(addr));
 	int res;
 
 	res = hostapd_allowed_address(hapd, addr, msg, len, info, 0);
@@ -2898,7 +2908,6 @@ static void handle_auth(struct hostapd_data *hapd,
 			const struct ieee80211_mgmt *mgmt, size_t len,
 			int rssi, int from_queue)
 {
-	WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->bssid));
 
 	u16 auth_alg, auth_transaction, status_code;
 	u16 resp = WLAN_STATUS_SUCCESS;
@@ -2956,8 +2965,15 @@ static void handle_auth(struct hostapd_data *hapd,
 	    mgmt->u.auth.variable[0] == WLAN_EID_CHALLENGE &&
 	    mgmt->u.auth.variable[1] == WLAN_AUTH_CHALLENGE_LEN)
 		challenge = &mgmt->u.auth.variable[2];
-	
-	WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
+
+	WIFIMON_INF(S_AUTH_HANDLE, "challenge=%d auth_transaction=%u status_code=%u seq_ctrl=%u auth_alg=%d"
+		" mac=" MACSTR " bssid=" MACSTR,
+		challenge,
+		auth_transaction,
+		status_code, 
+		seq_ctrl, 
+		auth_alg, 
+		MAC2STR(mgmt->sa),MAC2STR(mgmt->da));	
 	wpa_printf(MSG_DEBUG, "authentication: STA=" MACSTR " auth_alg=%d "
 		   "auth_transaction=%d status_code=%d wep=%d%s "
 		   "seq_ctrl=0x%x%s%s",
@@ -2973,6 +2989,7 @@ static void handle_auth(struct hostapd_data *hapd,
 			   "Unsupported authentication algorithm (%d)",
 			   auth_alg);
 		resp = WLAN_STATUS_NOT_SUPPORTED_AUTH_ALG;
+		WIFIMON_ERR(S_AUTH_HANDLE, "Unsupported authentication algorithm auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		goto fail;
 	}
 #endif /* CONFIG_NO_RC4 */
@@ -2981,6 +2998,7 @@ static void handle_auth(struct hostapd_data *hapd,
 		wpa_printf(MSG_DEBUG,
 			   "Ongoing TKIP countermeasures (Michael MIC failure) - reject authentication");
 		resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
+		WIFIMON_ERR(S_AUTH_HANDLE, "Ongoing TKIP countermeasures (Michael MIC failure) - reject authentication auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		goto fail;
 	}
 
@@ -3014,6 +3032,7 @@ static void handle_auth(struct hostapd_data *hapd,
 		wpa_printf(MSG_INFO, "Unsupported authentication algorithm (%d)",
 			   auth_alg);
 		resp = WLAN_STATUS_NOT_SUPPORTED_AUTH_ALG;
+		WIFIMON_ERR(S_AUTH_HANDLE, "Unsupported authentication algorithm auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		goto fail;
 	}
 
@@ -3025,6 +3044,7 @@ static void handle_auth(struct hostapd_data *hapd,
 		wpa_printf(MSG_INFO, "Unknown authentication transaction number (%d)",
 			   auth_transaction);
 		resp = WLAN_STATUS_UNKNOWN_AUTH_TRANSACTION;
+		WIFIMON_ERR(S_AUTH_HANDLE, "Unknown authentication transaction number auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		goto fail;
 	}
 
@@ -3032,6 +3052,7 @@ static void handle_auth(struct hostapd_data *hapd,
 		wpa_printf(MSG_INFO, "Station " MACSTR " not allowed to authenticate",
 			   MAC2STR(sa));
 		resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
+		WIFIMON_ERR(S_AUTH_HANDLE, "not allowed to authenticate auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		goto fail;
 	}
 
@@ -3056,7 +3077,7 @@ static void handle_auth(struct hostapd_data *hapd,
 			u8 *pos;
 			u32 info;
 			u8 op_class, channel, phytype;
-
+			WIFIMON_ERR(S_AUTH_HANDLE, "Reject authentication auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 			wpa_printf(MSG_DEBUG, "%s: Reject authentication from "
 				   MACSTR " since STA has been seen on %s",
 				   hapd->conf->iface, MAC2STR(sa),
@@ -3106,12 +3127,18 @@ static void handle_auth(struct hostapd_data *hapd,
 	int is_remote = hapd->conf->macaddr_acl == USE_EXTERNAL_RADIUS_AUTH ? 1 : 0;
 	int stage = is_remote ? S_AUTH_HANDLE_RADIUS : S_AUTH_HANDLE;
 	switch(res) {
-		case HOSTAPD_ACL_REJECT:
-		case HOSTAPD_ACL_ACCEPT_TIMEOUT:
-			WPA_MSG_WIFI_ERR(stage, "remote_acl=%d acl_res=%d seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, is_remote, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
-		case HOSTAPD_ACL_ACCEPT:
-		case HOSTAPD_ACL_PENDING:
-			WPA_MSG_WIFI_INF(stage, "remote_acl=%d acl_res=%d seq_ctrl=%u auth_alg=%d sa=" MACSTR " da=" MACSTR " bssid=" MACSTR, is_remote, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da),MAC2STR(mgmt->bssid));
+	case HOSTAPD_ACL_REJECT:
+		WIFIMON_ERR(stage, "reject remote_acl=%d acl_res=%d seq_ctrl=%u auth_alg=%u mac=" MACSTR " bssid=" MACSTR, is_remote, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
+		break;
+	case HOSTAPD_ACL_ACCEPT_TIMEOUT:
+		WIFIMON_ERR(stage, "timeout remote_acl=%d acl_res=%d seq_ctrl=%u auth_alg=%u mac=" MACSTR " bssid=" MACSTR, is_remote, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
+		break;
+	case HOSTAPD_ACL_ACCEPT:
+		WIFIMON_OK(stage, "accept remote_acl=%d acl_res=%d seq_ctrl=%u auth_alg=%u mac=" MACSTR " bssid=" MACSTR, is_remote, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
+		break;
+	case HOSTAPD_ACL_PENDING:
+		WIFIMON_INF(stage, "pending remote_acl=%d acl_res=%d seq_ctrl=%u auth_alg=%u mac=" MACSTR " bssid=" MACSTR, is_remote, res, seq_ctrl, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
+		break;
 	}
 
 
@@ -3121,6 +3148,7 @@ static void handle_auth(struct hostapd_data *hapd,
 			"Ignore Authentication frame from " MACSTR
 			" due to ACL reject", MAC2STR(sa));
 		resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
+		WIFIMON_ERR(S_AUTH_HANDLE, "Ignore Authentication frame from ACL reject auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		goto fail;
 	}
 	if (res == HOSTAPD_ACL_PENDING)
@@ -3138,6 +3166,7 @@ static void handle_auth(struct hostapd_data *hapd,
 		 * to avoid reordering Authentication frames within the same
 		 * SAE exchange. */
 		auth_sae_queue(hapd, mgmt, len, rssi);
+		WIFIMON_INF(S_AUTH_HANDLE, "auth_sae_queue auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		return;
 	}
 #endif /* CONFIG_SAE */
@@ -3155,11 +3184,13 @@ static void handle_auth(struct hostapd_data *hapd,
 				       HOSTAPD_LEVEL_DEBUG,
 				       "Drop repeated authentication frame seq_ctrl=0x%x",
 				       seq_ctrl);
+			WIFIMON_INF(S_AUTH_HANDLE, "Drop repeated authentication frame auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 			return;
 		}
 #ifdef CONFIG_PASN
 		if (auth_alg == WLAN_AUTH_PASN &&
 		    (sta->flags & WLAN_STA_ASSOC)) {
+			WIFIMON_INF(S_AUTH_HANDLE, "not yet known - drop Authentication frame auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 			wpa_printf(MSG_DEBUG,
 				   "PASN: auth: Existing station: " MACSTR,
 				   MAC2STR(sta->addr));
@@ -3331,6 +3362,7 @@ static void handle_auth(struct hostapd_data *hapd,
 					wpa_auth_sta_init(hapd->wpa_auth,
 							  sta->addr, NULL);
 			if (sta->wpa_sm == NULL) {
+				WIFIMON_ERR(S_AUTH_HANDLE, "Failed to initialize WPA state machine auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 				wpa_printf(MSG_DEBUG,
 					   "SAE: Failed to initialize WPA state machine");
 				resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
@@ -3338,6 +3370,7 @@ static void handle_auth(struct hostapd_data *hapd,
 			}
 		}
 #endif /* CONFIG_MESH */
+		WIFIMON_INF(S_HANDSHAKE, "handle_auth_sae auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		handle_auth_sae(hapd, sta, mgmt, len, auth_transaction,
 				status_code);
 		return;
@@ -3345,6 +3378,7 @@ static void handle_auth(struct hostapd_data *hapd,
 #ifdef CONFIG_FILS
 	case WLAN_AUTH_FILS_SK:
 	case WLAN_AUTH_FILS_SK_PFS:
+		WIFIMON_INF(S_HANDSHAKE, "handle_auth_fils auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		handle_auth_fils(hapd, sta, mgmt->u.auth.variable,
 				 len - IEEE80211_HDRLEN - sizeof(mgmt->u.auth),
 				 auth_alg, auth_transaction, status_code,
@@ -3353,6 +3387,7 @@ static void handle_auth(struct hostapd_data *hapd,
 #endif /* CONFIG_FILS */
 #ifdef CONFIG_PASN
 	case WLAN_AUTH_PASN:
+		WIFIMON_INF(S_AUTH_HANDLE, "handle_auth_pasn auth_alg=%u mac=" MACSTR " bssid=" MACSTR, auth_alg, MAC2STR(mgmt->sa),MAC2STR(mgmt->da));
 		handle_auth_pasn(hapd, sta, mgmt, len, auth_transaction,
 				 status_code);
 		return;
@@ -5816,7 +5851,6 @@ static void hostapd_deauth_sta(struct hostapd_data *hapd,
 	wpa_msg(hapd->msg_ctx, MSG_DEBUG,
 		"deauthentication: STA=" MACSTR " reason_code=%d",
 		MAC2STR(mgmt->sa), le_to_host16(mgmt->u.deauth.reason_code));
-
 	ap_sta_set_authorized(hapd, sta, 0);
 	sta->last_seq_ctrl = WLAN_INVALID_MGMT_SEQ;
 	sta->flags &= ~(WLAN_STA_AUTH | WLAN_STA_ASSOC |
@@ -5840,7 +5874,6 @@ static void hostapd_disassoc_sta(struct hostapd_data *hapd,
 	wpa_msg(hapd->msg_ctx, MSG_DEBUG,
 		"disassocation: STA=" MACSTR " reason_code=%d",
 		MAC2STR(mgmt->sa), le_to_host16(mgmt->u.disassoc.reason_code));
-
 	ap_sta_set_authorized(hapd, sta, 0);
 	sta->last_seq_ctrl = WLAN_INVALID_MGMT_SEQ;
 	sta->flags &= ~(WLAN_STA_ASSOC | WLAN_STA_ASSOC_REQ_OK);
@@ -6365,7 +6398,6 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
     }
 
 
-	// WPA_MSG_WIFI_INF(0, "");
 	struct ieee80211_mgmt *mgmt;
 	u16 fc, stype;
 	int ret = 0;
@@ -6391,43 +6423,39 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	stype = WLAN_FC_GET_STYPE(fc);
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WPA_MSG_WIFI_INF(S_AUTH_RX, "frame=mgmt::auth sa=" MACSTR " da=" MACSTR " bssid=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->bssid), stype);
+		WIFIMON_INF(S_AUTH_REQ, "frame=mgmt::auth_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d auth_alg=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.auth.auth_alg));
 		break;
 	case WLAN_FC_STYPE_ASSOC_REQ:
-		WPA_MSG_WIFI_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WIFIMON_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.assoc_req.capab_info));
 		break;
-	case WLAN_FC_STYPE_ASSOC_RESP:
-		break;
+	case WLAN_FC_STYPE_ASSOC_RESP: break;
 	case WLAN_FC_STYPE_REASSOC_REQ:
-		WPA_MSG_WIFI_INF(S_ASSOC_REQ, "frame=mgmt::reassoc_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WIFIMON_INF(S_REASSOC_REQ, "frame=mgmt::reassoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.reassoc_req.capab_info));
 		break;
-	case WLAN_FC_STYPE_REASSOC_RESP:
-		WPA_MSG_WIFI_INF(S_ASSOC_RESP, "frame=mgmt::reassoc_resp sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
-		break;
-	case WLAN_FC_STYPE_PROBE_REQ:
-		// WPA_MSG_WIFI_DEBUG(0, "mgmt::probe_req sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
-		break;
-	case WLAN_FC_STYPE_PROBE_RESP:
-		break;
-	case WLAN_FC_STYPE_BEACON:
-		// WPA_MSG_WIFI_INF(0, "mgmt::beacon sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
-		break;
+	case WLAN_FC_STYPE_REASSOC_RESP: break;
+	case WLAN_FC_STYPE_PROBE_REQ: break;
+	case WLAN_FC_STYPE_PROBE_RESP: break;
+	case WLAN_FC_STYPE_BEACON: break;
 	case WLAN_FC_STYPE_ATIM:
-		WPA_MSG_WIFI_INF(S_UNK, "frame=mgmt::atim sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		// WIFIMON_INF(S_UNK, "frame=mgmt::atim rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype);
+		break;
+	case WLAN_FC_STYPE_DISASSOC:
+		WIFIMON_INF(S_DISASSOC_REQ, "frame=mgmt::disassoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d reason_code=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.disassoc.reason_code));
 		break;
 	case WLAN_FC_STYPE_DEAUTH:
-		WPA_MSG_WIFI_INF(S_DEAUTH, "frame=mgmt::deauth sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WIFIMON_INF(S_DEAUTH_REQ, "frame=mgmt::deauth_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d reason_code=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.deauth.reason_code));
 		break;
 	case WLAN_FC_STYPE_ACTION:
-		WPA_MSG_WIFI_INF(S_UNK, "frame=mgmt::action sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		// WIFIMON_INF(S_UNK, "frame=mgmt::action rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype);
 		break;
 	case WLAN_FC_STYPE_ACTION_NO_ACK:
-		WPA_MSG_WIFI_INF(S_UNK, "frame=mgmt::action_no_ack sa=" MACSTR " da=" MACSTR " stype=%d", MAC2STR(mgmt->sa), MAC2STR(mgmt->da), stype);
+		WIFIMON_INF(S_UNK, "frame=mgmt::action_no_ack rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype);
 		break;
 	default:
-		WPA_MSG_WIFI_WARN(S_UNK, "frame=mgmt unknown fc subtype: %d", stype);
+		// WIFIMON_WARN(S_UNK, "frame=mgmt::unknown rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype);
 		return ret;
 	}
+
 
 	if (is_multicast_ether_addr(mgmt->sa) ||
 	    is_zero_ether_addr(mgmt->sa) ||
@@ -6464,7 +6492,6 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 #endif /* CONFIG_IEEE80211BE */
 	    !ether_addr_equal(mgmt->bssid, hapd->own_addr)) {
 		wpa_printf(MSG_INFO, "MGMT: BSSID=" MACSTR " not our address", MAC2STR(mgmt->bssid));
-		WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "MGMT: BSSID=" MACSTR " not our address", MAC2STR(mgmt->bssid));
 		return 0;
 	}
 
@@ -6542,12 +6569,14 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	switch (stype) {
 	case WLAN_FC_STYPE_ASSOC_REQ:
 	case WLAN_FC_STYPE_REASSOC_REQ:
-		char *ssidbuf[SSID_MAX_LEN];
+		char ssidbuf[SSID_MAX_LEN];
 		ssidbuf[0] = '\0';
+		size_t ssidbufsize = 0;
 		if (hapd->conf) {
-			memcpy(ssidbuf, hapd->conf->ssid.ssid, hapd->conf->ssid.ssid_len);
+			ssidbufsize = hapd->conf->ssid.ssid_len;
+			memcpy(ssidbuf, hapd->conf->ssid.ssid, ssidbufsize);
+			ssidbuf[ssidbufsize] = '\0';
 		}
-		WPA_MSG_WIFI_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req/reassoc_req ssid=%s bssid=" MACSTR, ssidbuf, MAC2STR(mgmt->bssid));
 		break;
 	}
 
@@ -6563,6 +6592,7 @@ static void handle_auth_cb(struct hostapd_data *hapd,
 	bool success_status;
 
 	sta = ap_get_sta(hapd, mgmt->da);
+
 	if (!sta) {
 		wpa_printf(MSG_DEBUG, "handle_auth_cb: STA " MACSTR
 			   " not found",
@@ -6576,12 +6606,15 @@ static void handle_auth_cb(struct hostapd_data *hapd,
 		auth_alg = 0;
 		auth_transaction = 0;
 		status_code = WLAN_STATUS_UNSPECIFIED_FAILURE;
+		WIFIMON_ERR(S_AUTH_HANDLE, "auth_alg=%u auth_transaction=%u status_code=%d ok=%d mac=" MACSTR " bssid=" MACSTR, auth_alg, auth_transaction, status_code, ok, MAC2STR(mgmt->da), MAC2STR(mgmt->bssid));
 		goto fail;
 	}
 
 	auth_alg = le_to_host16(mgmt->u.auth.auth_alg);
 	auth_transaction = le_to_host16(mgmt->u.auth.auth_transaction);
 	status_code = le_to_host16(mgmt->u.auth.status_code);
+
+	WIFIMON_MSG(status_code ? WIFIMON_ERR : WIFIMON_INF, S_AUTH_HANDLE, "auth_alg=%u auth_transaction=%u status_code=%d ok=%d mac=" MACSTR " bssid=" MACSTR, auth_alg, auth_transaction, status_code, ok, MAC2STR(mgmt->da), MAC2STR(mgmt->bssid));
 
 	if (!ok) {
 		hostapd_logger(hapd, mgmt->da, HOSTAPD_MODULE_IEEE80211,
@@ -7056,34 +7089,44 @@ void ieee802_11_mgmt_cb(struct hostapd_data *hapd, const u8 *buf, size_t len,
 
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WPA_MSG_WIFI_INF(S_AUTH_HANDLE, "mgmt::auth stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		if(le_to_host16(mgmt->u.auth.status_code)){
+			WIFIMON_MSG(WIFIMON_ERR, S_AUTH_RES, "mgmt::auth failed status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.auth.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		} else {
+			WIFIMON_MSG(WIFIMON_OK, S_AUTH_RES, "mgmt::auth status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.auth.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		}
 		handle_auth_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_ASSOC_RESP:
-		WPA_MSG_WIFI_INF(S_ASSOC_RESP, "mgmt::assoc_resp stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		if(le_to_host16(mgmt->u.assoc_resp.status_code)){
+			WIFIMON_MSG(WIFIMON_ERR, S_ASSOC_RES, "mgmt::assoc_resp failed status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.assoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		} else {
+			WIFIMON_MSG(WIFIMON_OK, S_ASSOC_RES, "mgmt::assoc_resp status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.assoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		}
 		handle_assoc_cb(hapd, mgmt, len, 0, ok);
 		break;
 	case WLAN_FC_STYPE_REASSOC_RESP:
-		WPA_MSG_WIFI_INF(S_ASSOC_RESP, "mgmt::reassoc_resp stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		if(le_to_host16(mgmt->u.reassoc_resp.status_code)){
+			WIFIMON_MSG(WIFIMON_ERR, S_ASSOC_RES, "mgmt::reassoc_resp failed status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.reassoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		} else {
+			WIFIMON_MSG(WIFIMON_OK, S_ASSOC_RES, "mgmt::reassoc_resp status_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.reassoc_resp.status_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
+		}		
 		handle_assoc_cb(hapd, mgmt, len, 1, ok);
 		break;
 	case WLAN_FC_STYPE_PROBE_RESP:
-		// WPA_MSG_WIFI_DEBUG(0, "mgmt::probe_resp stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
 		break;
 	case WLAN_FC_STYPE_DEAUTH:
-		WPA_MSG_WIFI_INF(S_DEAUTH, "mgmt::deauth stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		WIFIMON_INF(S_DEAUTH_RES, "mgmt::deauth reason_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.deauth.reason_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
 		handle_deauth_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_DISASSOC:
-		WPA_MSG_WIFI_INF(S_DEAUTH, "mgmt::disassoc stype=%d ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		WIFIMON_INF(S_DISASSOC_RES, "mgmt::disassoc reason_code=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.disassoc.reason_code), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
 		handle_disassoc_cb(hapd, mgmt, len, ok);
 		break;
 	case WLAN_FC_STYPE_ACTION:
-		WPA_MSG_WIFI_INF(0, "mgmt::action stype=%d cb ok=%d sa=" MACSTR " da=" MACSTR " mac=" MACSTR, stype, ok, MAC2STR(mgmt->sa), MAC2STR(mgmt->da), MAC2STR(mgmt->da));
+		WIFIMON_INF(S_UNK, "mgmt::action category=%u stype=%d ok=%d bssid=" MACSTR " mac=" MACSTR, le_to_host16(mgmt->u.action.category), stype, ok, MAC2STR(mgmt->bssid), MAC2STR(mgmt->da));
 		handle_action_cb(hapd, mgmt, len, ok);
 		break;
 	default:
-	WPA_MSG_WIFI_INF(0, "unknown mgmt cb frame subtype %d", stype);
 		wpa_printf(MSG_INFO, "unknown mgmt cb frame subtype %d", stype);
 		break;
 	}

@@ -38,6 +38,8 @@
 #define STATE_MACHINE_DATA struct wpa_state_machine
 #define STATE_MACHINE_DEBUG_PREFIX "WPA"
 #define STATE_MACHINE_ADDR wpa_auth_get_spa(sm)
+#define STATE_MACHINE_HAPD sm->hapd
+static u8 zeromac[ETH_ALEN] = {0};
 
 
 static void wpa_send_eapol_timeout(void *eloop_ctx, void *timeout_ctx);
@@ -243,8 +245,13 @@ static inline void wpa_auth_set_eapol(struct wpa_authenticator *wpa_auth,
 				      const u8 *addr, wpa_eapol_variable var,
 				      int value)
 {
-	if (wpa_auth->cb->set_eapol)
+	if (wpa_auth->cb->set_eapol){
+		WIFIMON_INF(S_HANDSHAKE, "wpa_auth_set_eapol var=%d val=%d mac=" MACSTR " bssid=" MACSTR, var, value, MAC2STR(addr), MAC2STR(wpa_auth->hapd ? wpa_auth->hapd->own_addr : zeromac));
+		if(var == WPA_EAPOL_authorized && value != 0){
+			WIFIMON_OK(S_HANDSHAKE_DONE, "wpa_auth_set_eapol handshake done var=%d val=%d done mac=" MACSTR " bssid=" MACSTR, var, value, MAC2STR(addr), MAC2STR(wpa_auth->hapd ? wpa_auth->hapd->own_addr : zeromac));
+		}
 		wpa_auth->cb->set_eapol(wpa_auth->cb_ctx, addr, var, value);
+	}
 }
 
 
@@ -725,7 +732,7 @@ static struct wpa_group * wpa_group_init(struct wpa_authenticator *wpa_auth,
  * @cb: Callback functions for WPA authenticator
  * Returns: Pointer to WPA authenticator data or %NULL on failure
  */
-struct wpa_authenticator * wpa_init(const u8 *addr,
+struct wpa_authenticator * wpa_init(struct hostapd_data *hapd, const u8 *addr,
 				    struct wpa_auth_config *conf,
 				    const struct wpa_auth_callbacks *cb,
 				    void *cb_ctx)
@@ -823,7 +830,8 @@ struct wpa_authenticator * wpa_init(const u8 *addr,
 			conf->tx_bss_auth->conf.group_mgmt_cipher =
 				conf->group_mgmt_cipher;
 	}
-
+	
+	wpa_auth->hapd = hapd;
 	return wpa_auth;
 }
 
@@ -1994,7 +2002,13 @@ void __wpa_send_eapol(struct wpa_authenticator *wpa_auth,
 		version = WPA_KEY_INFO_TYPE_HMAC_MD5_RC4;
 
 	pairwise = !!(key_info & WPA_KEY_INFO_KEY_TYPE);
-
+	WIFIMON_INF(
+		S_HANDSHAKE,
+		"send eapol version=%d mac=" MACSTR " bssid=" MACSTR,
+		version,
+		MAC2STR(sm->addr),
+		MAC2STR(sm->hapd ? sm->hapd->own_addr : zeromac)
+	);
 	wpa_printf(MSG_DEBUG,
 		   "WPA: Send EAPOL(version=%d secure=%d mic=%d ack=%d install=%d pairwise=%d kde_len=%zu keyidx=%d encr=%d)",
 		   version,
@@ -5151,7 +5165,7 @@ SM_STATE(WPA_PTK, PTKINITDONE)
 			 sm->wpa == WPA_VERSION_WPA ? "WPA" : "RSN");
 	wpa_msg(sm->wpa_auth->conf.msg_ctx, MSG_INFO, "EAPOL-4WAY-HS-COMPLETED "
 		MACSTR, MAC2STR(sm->addr));
-	WPA_MSG_WIFI_INF(S_HANDSHAKE, "pairwise key handshake completed wpa_version=%d sa=" MACSTR, sm->wpa, MAC2STR(sm->addr));
+	WIFIMON_OK(S_HANDSHAKE_DONE, "pairwise key handshake completed wpa_version=%d mac=" MACSTR " bssid=" MACSTR, sm->wpa, MAC2STR(sm->addr), MAC2STR(sm->hapd ? sm->hapd->own_addr : zeromac));
 
 
 #ifdef CONFIG_IEEE80211R_AP

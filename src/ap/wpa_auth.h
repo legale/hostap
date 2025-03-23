@@ -16,6 +16,7 @@
 
 struct vlan_description;
 struct mld_info;
+struct hostapd_data;
 
 #define MAX_OWN_IE_OVERRIDE 257
 
@@ -430,7 +431,7 @@ struct wpa_auth_callbacks {
 	int (*get_drv_flags)(void *ctx, u64 *drv_flags, u64 *drv_flags2);
 };
 
-struct wpa_authenticator * wpa_init(const u8 *addr,
+struct wpa_authenticator * wpa_init(struct hostapd_data *hapd, const u8 *addr,
 				    struct wpa_auth_config *conf,
 				    const struct wpa_auth_callbacks *cb,
 				    void *cb_ctx);
