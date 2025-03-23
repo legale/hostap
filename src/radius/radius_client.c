@@ -760,18 +760,23 @@ int radius_client_send(struct radius_client_data *radius,
 		abuf[0] = '\0';
 		if(msg_type == RADIUS_AUTH){
 			hostapd_ip_txt(&conf->auth_server->addr, abuf, sizeof(abuf));
-		} else if (msg_type == RADIUS_ACCT){
+		} else if (msg_type == RADIUS_ACCT || msg_type == RADIUS_ACCT_INTERIM){
 			hostapd_ip_txt(&conf->acct_server->addr, abuf, sizeof(abuf));
 		}
 
 		int stage = S_RADIUS_AUTH_REQ;
 		if(msg_type == RADIUS_AUTH){
 			stage = S_RADIUS_AUTH_REQ;
-		} else if (msg_type == RADIUS_ACCT){
+		} else if (msg_type == RADIUS_ACCT || msg_type == RADIUS_ACCT_INTERIM){
 			stage = S_RADIUS_ACCT_REQ;
 		}
+		struct radius_hdr *hdr = radius_msg_get_hdr(msg);
+		int radius_code = 0;
+		if(hdr){
+			radius_code = hdr->code;
+		}
 
-		WIFIMON_MSG(WIFIMON_OK, stage, "radius send radius_server=%s radius_type=%d mac=" MACSTR " bssid=" MACSTR, abuf, msg_type, MAC2STR(addr), MAC2STR(bssid));
+		WIFIMON_MSG(WIFIMON_OK, stage, "radius send radius_server=%s radius_code=%d radius_type=%d mac=" MACSTR " bssid=" MACSTR, abuf, radius_code, msg_type, MAC2STR(addr), MAC2STR(bssid));
 	}
 
 	const u8 *shared_secret;
@@ -982,7 +987,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	int stage = S_RADIUS_AUTH_RES;
 	if(msg_type == RADIUS_AUTH){
 		stage = S_RADIUS_AUTH_RES;
-	} else if (msg_type == RADIUS_ACCT){
+	} else if (msg_type == RADIUS_ACCT || msg_type == RADIUS_ACCT_INTERIM){
 		stage = S_RADIUS_ACCT_RES;
 	}
 	WIFIMON_MSG(wifimon_status,
