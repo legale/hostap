@@ -3831,7 +3831,7 @@ SM_STEP(WPA_PTK)
 			SM_ENTER(WPA_PTK, PTKINITNEGOTIATING);
 		break;
 	case WPA_PTK_PTKINITDONE:
-		WIFIMON_OK(S_HANDSHAKE_DONE, "handshake done mac=" MACSTR " bssid=" MACSTR, MAC2STR(STATE_MACHINE_ADDR), MAC2STR(sm->hapd ? sm->hapd->own_addr : zeromac));
+		// WIFIMON_OK(S_HANDSHAKE_DONE, "handshake done mac=" MACSTR " bssid=" MACSTR, MAC2STR(STATE_MACHINE_ADDR), MAC2STR(sm->hapd ? sm->hapd->own_addr : zeromac));
 		break;
 	}
 }
