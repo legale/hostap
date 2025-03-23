@@ -393,6 +393,8 @@ static void hostapd_wpa_auth_disconnect(void *ctx, const u8 *addr,
 					u16 reason)
 {
 	struct hostapd_data *hapd = ctx;
+	WIFIMON_ERR(S_HANDSHAKE, "authenticator requests disconnect mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
+	
 	wpa_printf(MSG_DEBUG, "%s: WPA authenticator requests disconnect: "
 		   "STA " MACSTR " reason %d",
 		   __func__, MAC2STR(addr), reason);
@@ -403,16 +405,17 @@ static void hostapd_wpa_auth_disconnect(void *ctx, const u8 *addr,
 static int hostapd_wpa_auth_mic_failure_report(void *ctx, const u8 *addr)
 {
 	struct hostapd_data *hapd = ctx;
+	WIFIMON_ERR(S_HANDSHAKE, "message integrity check failed mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
+
 	return michael_mic_failure(hapd, addr, 0);
-	WPA_MSG_WIFI_ERR(S_HANDSHAKE, "message integrity check failed sa=" MACSTR, MAC2STR(addr));
 }
 
 
 static void hostapd_wpa_auth_psk_failure_report(void *ctx, const u8 *addr)
 {
-	WPA_MSG_WIFI_ERR(S_HANDSHAKE, AP_STA_POSSIBLE_PSK_MISMATCH " sa=" MACSTR, MAC2STR(addr));
-	
 	struct hostapd_data *hapd = ctx;
+	WIFIMON_ERR(S_HANDSHAKE, AP_STA_POSSIBLE_PSK_MISMATCH " mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
+
 	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POSSIBLE_PSK_MISMATCH MACSTR,
 		MAC2STR(addr));
 }
@@ -423,8 +426,6 @@ static void hostapd_wpa_auth_set_eapol(void *ctx, const u8 *addr,
 {
 	struct hostapd_data *hapd = ctx;
 	struct sta_info *sta = ap_get_sta(hapd, addr);
-
-	WPA_MSG_WIFI_INF(S_HANDSHAKE, "sa=" MACSTR " wpa_eapol_var=%d val=%d", MAC2STR(sta->addr), var, value);
 
 	if (sta == NULL)
 		return;
@@ -1857,7 +1858,7 @@ int hostapd_setup_wpa(struct hostapd_data *hapd)
 	hostapd_wpa_auth_conf(hapd->iface, hapd->conf, hapd->iconf, &_conf);
 	hostapd_wpa_auth_config_update(hapd, &_conf);
 
-	hapd->wpa_auth = wpa_init(hapd->own_addr, &_conf, &cb, hapd);
+	hapd->wpa_auth = wpa_init(hapd, hapd->own_addr, &_conf, &cb, hapd);
 	if (hapd->wpa_auth == NULL) {
 		wpa_printf(MSG_ERROR, "WPA initialization failed.");
 		return -1;

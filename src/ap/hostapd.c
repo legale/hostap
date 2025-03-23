@@ -4173,7 +4173,12 @@ void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 	/* Start accounting here, if IEEE 802.1X and WPA are not used.
 	 * IEEE 802.1X/WPA code will start accounting after the station has
 	 * been authorized. */
-	if (!hapd->conf->ieee802_1x && !hapd->conf->wpa) {
+	if (!hapd->conf->ieee802_1x && !hapd->conf->wpa &&
+	    !hapd->conf->osen) {
+		if (sta)
+			WIFIMON_INF(0, "sta authorized mac=" MACSTR " bssid=" MACSTR,
+				    MAC2STR(sta->addr),
+				    MAC2STR(hapd->own_addr));
 		if (ap_sta_set_authorized(hapd, sta, 1)) {
 			/* Update driver authorized flag for the STA to cover
 			 * the case where AP SME is in the driver and there is

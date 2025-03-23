@@ -82,6 +82,7 @@ void hostapd_notify_assoc_fils_finish(struct hostapd_data *hapd,
 				      sta->fils_pending_assoc_is_reassoc,
 				      WLAN_STATUS_SUCCESS,
 				      buf, p - buf);
+	if(sta) WIFIMON_INF(0, "sta authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	updated = ap_sta_set_authorized_flag(hapd, sta, 1);
 	new_assoc = (sta->flags & WLAN_STA_ASSOC) == 0;
 	sta->flags |= WLAN_STA_AUTH | WLAN_STA_ASSOC;
@@ -959,8 +960,10 @@ skip_wpa_check:
 	if (sta->auth_alg == WLAN_AUTH_FT ||
 	    sta->auth_alg == WLAN_AUTH_FILS_SK ||
 	    sta->auth_alg == WLAN_AUTH_FILS_SK_PFS ||
-	    sta->auth_alg == WLAN_AUTH_FILS_PK)
+	    sta->auth_alg == WLAN_AUTH_FILS_PK){
+		if(sta) WIFIMON_INF(0, "sta authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		updated = ap_sta_set_authorized_flag(hapd, sta, 1);
+	}
 #else /* CONFIG_IEEE80211R_AP || CONFIG_FILS */
 	/* Keep compiler silent about unused variables */
 	if (status) {
@@ -1146,7 +1149,6 @@ legacy:
 void hostapd_event_sta_low_ack(struct hostapd_data *hapd, const u8 *addr)
 {
 	struct sta_info *sta = ap_get_sta(hapd, addr);
-	WPA_MSG_WIFI_ERR(0, "sa=" MACSTR, MAC2STR(addr));
 
 #ifdef CONFIG_IEEE80211BE
 	struct hostapd_data *orig_hapd = hapd;
@@ -1178,7 +1180,6 @@ void hostapd_event_sta_opmode_changed(struct hostapd_data *hapd, const u8 *addr,
 				      enum smps_mode smps_mode,
 				      enum chan_width chan_width, u8 rx_nss)
 {
-	WPA_MSG_WIFI_INF(0, "sa=" MACSTR, MAC2STR(addr));
 
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 	const char *txt;
@@ -1483,10 +1484,8 @@ void hostapd_event_connect_failed_reason(struct hostapd_data *hapd,
 {
 	switch (reason_code) {
 	case MAX_CLIENT_REACHED:
-		WPA_MSG_WIFI_ERR(0, AP_REJECTED_MAX_STA " sa=" MACSTR, MAC2STR(addr));
 		break;
 	case BLOCKED_CLIENT:
-		WPA_MSG_WIFI_ERR(0, AP_REJECTED_BLOCKED_STA " sa=" MACSTR, MAC2STR(addr));
 		break;
 	}
 }
@@ -2088,7 +2087,6 @@ static void hostapd_mgmt_tx_cb(struct hostapd_data *hapd, const u8 *buf,
 
 static int hostapd_event_new_sta(struct hostapd_data *hapd, const u8 *addr)
 {
-	WPA_MSG_WIFI_INF(0, "sa=" MACSTR, MAC2STR(addr));
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 
 	if (sta)
@@ -2732,9 +2730,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 	case EVENT_PORT_AUTHORIZED:
 		/* Port authorized event for an associated STA */
 		sta = ap_get_sta(hapd, data->port_authorized.sta_addr);
-		if (sta)
+		if (sta){
 			ap_sta_set_authorized(hapd, sta, 1);
-		else
+		} else
 			wpa_printf(MSG_DEBUG,
 				   "No STA info matching port authorized event found");
 		break;

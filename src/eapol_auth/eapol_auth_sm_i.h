@@ -32,11 +32,13 @@ struct eapol_authenticator {
 	u8 default_wep_key_idx;
 };
 
+struct hostapd_data;
 
 /**
  * struct eapol_state_machine - Per-Supplicant Authenticator state machines
  */
 struct eapol_state_machine {
+	struct hostapd_data *hapd;
 	/* timers */
 	int aWhile;
 	int quietWhile;

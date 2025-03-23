@@ -405,38 +405,46 @@ int str_to_debug_level(const char *s);
 #define __FILENAME__ (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
 
 typedef enum wifi_stage {
-  S_UNK,                // unknown stage
-  S_AUTH_RX,            // incoming mgmt::auth frame
-  S_AUTH_HANDLE,        // handle auth
-  S_AUTH_HANDLE_RADIUS, // handle auth RADIUS USE_EXTERNAL_RADIUS_AUTH
-  S_ASSOC_REQ,          // assoc req stage
-  S_ASSOC_RESP,         // assoc resp stage
-  S_RADIUS_REQ,         // radius req stage
-  S_RADIUS_RESP,        // radius resp stage
-  S_HANDSHAKE,          // handshake stage
-  S_AUTHORIZED,         // sta connected stage
-  S_DEAUTHORIZED,       // sta disconnected stage
-  S_DEAUTH,             // deauth disassoc stage
+	S_UNK = 0,                // unknown stage
+	S_AUTH_REQ = 1,           // incoming mgmt::auth frame
+	S_AUTH_HANDLE = 2,        // handle auth
+	S_AUTH_HANDLE_RADIUS = 3, // handle auth RADIUS USE_EXTERNAL_RADIUS_AUTH
+	S_AUTH_RES = 4,           // outgoing mgmt::auth frame
+	S_ASSOC_REQ = 5,          // incoming mgmt::assoc frame
+	S_ASSOC_RES = 6,          // outgoing mgmt::assoc frame
+	S_RADIUS_AUTH_REQ = 7,    // radius req stage
+	S_RADIUS_AUTH_RES = 8,    // radius resp stage
+	S_HANDSHAKE = 9,          // handshake stage
+	S_HANDSHAKE_DONE = 10,    // handshake done stage
+	S_AUTHORIZED = 11,        // sta connected stage
+	S_DEAUTHORIZED = 12,      // sta disconnected stage
+	S_DEAUTH_REQ = 13,        // incoming mgmt:deauth frame
+	S_DEAUTH_RES = 14,        // outgoing mgmt:deauth frame
+	S_DISASSOC_REQ = 15,      // incoming mgmt::disassoc frame
+	S_DISASSOC_RES = 16,      // outgoing mgmt::disassoc frame
+	S_RADIUS_ACCT_REQ = 17,   // radius req acct stage
+	S_RADIUS_ACCT_RES = 18,   // radius resp acct stage
+	S_REASSOC_REQ = 19,       // incoming mgmt::reassoc frame
+	S_REASSOC_RES = 20,       // outgoing mgmt::reassoc frame
 } wifi_stage_t;
 
-// Макрос для сообщений об успешных операциях (status=0)
-#define WPA_MSG_WIFI_OK(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=0 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+typedef enum wifimon_status {
+	WIFIMON_OK = 0,
+	WIFIMON_INF = 1,
+	WIFIMON_ERR = 2,
+	WIFIMON_WARN = 3,
+} wifimon_status_t;
 
-// Макрос для информационных сообщений (status=1)
-#define WPA_MSG_WIFI_INF(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=1 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+void wpa_msg_glo(int level, const char *fmt, ...);
 
-// Макрос для сообщений об ошибках (status=2)
-#define WPA_MSG_WIFI_ERR(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=2 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+// Макрос для сообщений wifimon с разным статусом
+#define WIFIMON_MSG(wifimon_status, stage, fmt, ...) \
+	wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: wifimon_status=%d stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, wifimon_status, stage, ##__VA_ARGS__)
 
-// Макрос для сообщений с предупреждением (status=3)
-#define WPA_MSG_WIFI_WARN(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
-
-// Макрос для сообщений с предупреждением (status=3)
-#define WPA_MSG_WIFI_DEBUG(stage, fmt, ...) \
-    wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: status=3 stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, stage, ##__VA_ARGS__)
+#define WIFIMON_OK(stage, fmt, ...) WIFIMON_MSG(WIFIMON_OK, stage, fmt, ##__VA_ARGS__)
+#define WIFIMON_INF(stage, fmt, ...) WIFIMON_MSG(WIFIMON_INF, stage, fmt, ##__VA_ARGS__)
+#define WIFIMON_ERR(stage, fmt, ...) WIFIMON_MSG(WIFIMON_ERR, stage, fmt, ##__VA_ARGS__)
+#define WIFIMON_WARN(stage, fmt, ...) WIFIMON_MSG(WIFIMON_WARN, stage, fmt, ##__VA_ARGS__)
+#define WIFIMON_DEBUG(stage, fmt, ...) WIFIMON_MSG(WIFIMON_WARN, stage, fmt, ##__VA_ARGS__)
 
 #endif /* WPA_DEBUG_H */
