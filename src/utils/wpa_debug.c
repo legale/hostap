@@ -12,6 +12,8 @@
 
 #include "../ap/hostapd.h"
 
+#include <time.h>
+
 #ifdef CONFIG_DEBUG_SYSLOG
 #include <syslog.h>
 #endif /* CONFIG_DEBUG_SYSLOG */
@@ -201,10 +203,22 @@ struct hapd_interfaces *global_ifaces = NULL;
 void wpa_msg_glo(int level, const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-
-    char buf[1024];
-	
-    int len = vsnprintf(buf, sizeof(buf), fmt, ap);
+    
+    // Получаем текущее монотонное время
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    
+    char time_buf[64];
+    snprintf(time_buf, sizeof(time_buf), " ts=%ld.%09ld", 
+             (long)ts.tv_sec, (long)ts.tv_nsec);
+    
+    // Объединяем метку времени и исходное сообщение
+    char fmt_with_time[1088]; // 64 (время) + 1024 (исходный буфер)
+    snprintf(fmt_with_time, sizeof(fmt_with_time), "%s%s", fmt,  time_buf);
+    
+    char buf[1024 + 64]; // Увеличиваем буфер для сообщения с временной меткой
+    
+    int len = vsnprintf(buf, sizeof(buf), fmt_with_time, ap);
 
     if (len < 0 || len >= sizeof(buf)) {
         fprintf(stderr, "Error formatting message\n");
@@ -212,7 +226,9 @@ void wpa_msg_glo(int level, const char *fmt, ...) {
 
     va_end(ap);
 
-    hostapd_ctrl_iface_send_internal(global_ifaces->global_ctrl_sock, &global_ifaces->global_ctrl_dst, "global", level, buf, len);
+    hostapd_ctrl_iface_send_internal(global_ifaces->global_ctrl_sock, 
+                                     &global_ifaces->global_ctrl_dst, 
+                                     "global", level, buf, len);
 }
 
 /**
