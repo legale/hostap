@@ -10492,7 +10492,6 @@ static void nl80211_send_null_frame(struct i802_bss *bss, const u8 *own_addr,
 		wpa_printf(MSG_DEBUG, "nl80211_send_null_frame: Failed to "
 			   "send poll frame");
 
-	wpa_msg_glo(MSG_WIFIMON, "sent null frame sa=" MACSTR " da=" MACSTR, MAC2STR(own_addr), MAC2STR(addr));
 }
 
 static void nl80211_poll_client(void *priv, const u8 *own_addr, const u8 *addr,

@@ -4125,7 +4125,6 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 							 reply, reply_size);
 #endif /* CONFIG_TAXONOMY */
 	} else if (os_strncmp(buf, "POLL_STA ", 9) == 0) {
-		wpa_msg_glo(MSG_DEBUG, "CTRL_IFACE POLL_STA %s", buf);
 		if (hostapd_ctrl_iface_poll_sta(hapd, buf + 9))
 			reply_len = -1;
 	} else if (os_strcmp(buf, "STOP_AP") == 0) {

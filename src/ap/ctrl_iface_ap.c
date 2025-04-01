@@ -773,9 +773,6 @@ int hostapd_ctrl_iface_poll_sta(struct hostapd_data *hapd,
 	u8 addr[ETH_ALEN];
 	struct sta_info *sta;
 
-	printf("CTRL_IFACE POLL_STA %s\n", txtaddr);
-	wpa_msg_glo(MSG_DEBUG, "CTRL_IFACE POLL_STA %s", txtaddr);
-
 	wpa_dbg(hapd->msg_ctx, MSG_DEBUG, "CTRL_IFACE POLL_STA %s", txtaddr);
 
 	if (hwaddr_aton(txtaddr, addr))
@@ -785,7 +782,6 @@ int hostapd_ctrl_iface_poll_sta(struct hostapd_data *hapd,
 	if (!sta)
 		return -1;
 
-	u8 bcast[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	hostapd_drv_poll_client(hapd, hapd->own_addr, addr,
 				sta->flags & WLAN_STA_WMM);

@@ -64,9 +64,7 @@ void wpa_debug_stop_log(void);
  * messages.
  */
 void wpa_debug_print_timestamp(void);
-uintmax_t diff_nsec(struct timespec t1, struct timespec t2);
 
-int a2mac_80211x(const u8 *mac_str, u8 *mac);
 void wpa_msg_glo(int level, const char *fmt, ...);
 
 /**
