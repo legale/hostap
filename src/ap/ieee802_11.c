@@ -8,6 +8,7 @@
  */
 
 #include <time.h>
+#include <sys/stat.h>
 
 #include "utils/includes.h"
 
@@ -7816,8 +7817,6 @@ void hostapd_tx_status(struct hostapd_data *hapd, const u8 *addr,
 
 void hostapd_client_poll_ok(struct hostapd_data *hapd, const u8 *addr)
 {
-	static struct timespec ts_end;
-	clock_gettime(CLOCK_MONOTONIC, &ts_end);
 	struct sta_info *sta;
 	struct hostapd_iface *iface = hapd->iface;
 
@@ -7834,7 +7833,6 @@ void hostapd_client_poll_ok(struct hostapd_data *hapd, const u8 *addr)
 	if (sta == NULL)
 		return;
 
-	wpa_msg(hapd->msg_ctx, MSG_INFO, "hostapd_client_poll_ok ns_diff: %" PRIuMAX " mac=" MACSTR, diff_nsec(ts, ts_end), MAC2STR(addr));
 	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POLL_OK MACSTR " client poll ok",
 		MAC2STR(sta->addr));
 	if (!(sta->flags & WLAN_STA_PENDING_POLL))
