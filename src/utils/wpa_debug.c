@@ -6,13 +6,15 @@
  * See README for more details.
  */
 
-#include "includes.h"
+ #include <time.h>
 
-#include "common.h"
+ #include "includes.h"
+ 
+ #include "common.h"
+ 
+ #include "../ap/hostapd.h"
+ #include "common/ctrl_iface_common.h"
 
-#include "../ap/hostapd.h"
-
-#include <time.h>
 
 #ifdef CONFIG_DEBUG_SYSLOG
 #include <syslog.h>
@@ -200,35 +202,59 @@ void wpa_debug_close_linux_tracing(void)
 
 struct hapd_interfaces *global_ifaces = NULL;
 
-void wpa_msg_glo(int level, const char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    
-    // Получаем текущее монотонное время
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    
-    char time_buf[64];
-    snprintf(time_buf, sizeof(time_buf), " ts=%ld.%09ld", 
-             (long)ts.tv_sec, (long)ts.tv_nsec);
-    
-    // Объединяем метку времени и исходное сообщение
-    char fmt_with_time[1088]; // 64 (время) + 1024 (исходный буфер)
-    snprintf(fmt_with_time, sizeof(fmt_with_time), "%s%s", fmt,  time_buf);
-    
-    char buf[1024 + 64]; // Увеличиваем буфер для сообщения с временной меткой
-    
-    int len = vsnprintf(buf, sizeof(buf), fmt_with_time, ap);
-
-    if (len < 0 || len >= sizeof(buf)) {
-        fprintf(stderr, "Error formatting message\n");
+void wpa_msg_glo(int level, const char *fmt, ...)
+{
+    if (!global_ifaces || global_ifaces->global_ctrl_sock == -1 || 
+        dl_list_empty(&global_ifaces->global_ctrl_dst)) {
+        return;
     }
 
+    // Формируем сообщение
+    va_list ap;
+    va_start(ap, fmt);
+    char msg[1024];
+    int len = vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
 
-    hostapd_ctrl_iface_send_internal(global_ifaces->global_ctrl_sock, 
-                                     &global_ifaces->global_ctrl_dst, 
-                                     "global", level, buf, len);
+    if (len < 0 || len >= sizeof(msg)) return;
+
+    // Добавляем временную метку
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) return;
+
+    char buf[1088];
+    int buflen = snprintf(buf, sizeof(buf), "IFNAME=GLOBAL <%d>%s ts=%ld.%09ld",
+                         level, msg, (long)ts.tv_sec, ts.tv_nsec);
+    if (buflen < 0 || buflen >= sizeof(buf)) return;
+
+    // Подготовка сообщения
+    struct iovec io[1] = {
+        { .iov_base = buf, .iov_len = buflen }
+    };
+
+    struct msghdr hdr = {
+        .msg_iov = io,
+        .msg_iovlen = 1,
+    };
+
+    // Отправка всем подписчикам
+    struct wpa_ctrl_dst *dst, *next;
+    dl_list_for_each_safe(dst, next, &global_ifaces->global_ctrl_dst, 
+                         struct wpa_ctrl_dst, list) {
+        if (level >= dst->debug_level) {
+            hdr.msg_name = &dst->addr;
+            hdr.msg_namelen = dst->addrlen;
+            
+            if (sendmsg(global_ifaces->global_ctrl_sock, &hdr, MSG_NOSIGNAL) < 0) {
+                if (errno == ENOENT || dst->errors++ > 10) {
+                    dl_list_del(&dst->list);
+                    os_free(dst);
+                }
+            } else {
+                dst->errors = 0;
+            }
+        }
+    }
 }
 
 /**

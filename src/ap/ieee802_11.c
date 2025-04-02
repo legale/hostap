@@ -5779,7 +5779,7 @@ static void handle_disassoc(struct hostapd_data *hapd,
 			   MAC2STR(mgmt->sa));
 		return;
 	}
-	if(sta) WIFIMON_INF(0, "sta not authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+	if(sta) WIFIMON_INF(0, "ap_sta_set_authorized not authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	sta->last_seq_ctrl = WLAN_INVALID_MGMT_SEQ;
 	sta->flags &= ~(WLAN_STA_ASSOC | WLAN_STA_ASSOC_REQ_OK);
@@ -5846,7 +5846,7 @@ static void handle_deauth(struct hostapd_data *hapd,
 		return;
 	}
 
-	if(sta) WIFIMON_INF(0, "sta not authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+	if(sta) WIFIMON_INF(0, "ap_sta_set_authorized not authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	sta->last_seq_ctrl = WLAN_INVALID_MGMT_SEQ;
 	sta->flags &= ~(WLAN_STA_AUTH | WLAN_STA_ASSOC |
@@ -6434,7 +6434,7 @@ static void handle_assoc_cb(struct hostapd_data *hapd,
 		 * Open, static WEP, FT protocol, or FILS; no separate
 		 * authorization step.
 		 */
-		if(sta) WIFIMON_INF(0, "sta authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+		if(sta) WIFIMON_INF(0, "ap_sta_set_authorized authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		ap_sta_set_authorized(hapd, sta, 1);
 	}
 

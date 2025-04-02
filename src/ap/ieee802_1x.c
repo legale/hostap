@@ -113,13 +113,13 @@ void ieee802_1x_set_sta_authorized(struct hostapd_data *hapd,
 		return;
 
 	if (authorized) {
-		if(sta) WIFIMON_INF(0, "sta authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+		if(sta) WIFIMON_INF(0, "ap_sta_set_authorized authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		ap_sta_set_authorized(hapd, sta, 1);
 		res = hostapd_set_authorized(hapd, sta, 1);
 		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE8021X,
 			       HOSTAPD_LEVEL_DEBUG, "authorizing port");
 	} else {
-		if(sta) WIFIMON_INF(0, "sta not authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+		if(sta) WIFIMON_INF(0, "ap_sta_set_authorized not authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		ap_sta_set_authorized(hapd, sta, 0);
 		res = hostapd_set_authorized(hapd, sta, 0);
 		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE8021X,

@@ -3376,8 +3376,8 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 	reply_len = 3;
 
 	if (os_strcmp(buf, "PING") == 0) {
-		os_memcpy(reply, "PONG\n", 5);
-		reply_len = 5;
+		os_memcpy(reply, "IFNAME PONG\n", sizeof("IFNAME PONG\n"));
+		reply_len =  sizeof("IFNAME PONG\n");
 	} else if (os_strncmp(buf, "RELOG", 5) == 0) {
 		if (wpa_debug_reopen_file() < 0)
 			reply_len = -1;
@@ -4693,8 +4693,8 @@ static void hostapd_global_ctrl_iface_receive(int sock, void *eloop_ctx,
 	}
 
 	if (os_strcmp(buf, "PING") == 0) {
-		os_memcpy(reply, "PONG\n", 5);
-		reply_len = 5;
+		os_memcpy(reply, "GLOBAL PONG\n", sizeof("GLOBAL PONG\n"));
+		reply_len = sizeof("GLOBAL PONG\n");
 	} else if (os_strncmp(buf, "RELOG", 5) == 0) {
 		if (wpa_debug_reopen_file() < 0)
 			reply_len = -1;
@@ -5044,7 +5044,7 @@ static int hostapd_ctrl_check_event_enabled(struct wpa_ctrl_dst *dst,
 }
 
 
-void hostapd_ctrl_iface_send_internal(int sock, struct dl_list *ctrl_dst,
+static void hostapd_ctrl_iface_send_internal(int sock, struct dl_list *ctrl_dst,
 					     const char *ifname, int level,
 					     const char *buf, size_t len)
 {
