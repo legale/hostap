@@ -6123,7 +6123,7 @@ static int hostapd_ctrl_check_event_enabled(struct wpa_ctrl_dst *dst,
 }
 
 
-void hostapd_ctrl_iface_send_internal(int sock, struct dl_list *ctrl_dst,
+static void hostapd_ctrl_iface_send_internal(int sock, struct dl_list *ctrl_dst,
 					     const char *ifname, int level,
 					     const char *buf, size_t len)
 {
