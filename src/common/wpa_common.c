@@ -991,8 +991,7 @@ static int wpa_ft_parse_ftie(const u8 *ie, size_t ie_len,
 }
 
 
-int wpa_ft_parse_ies(const u8 *ies, size_t ies_len,
-		     struct wpa_ft_ies *parse, int use_sha384)
+int wpa_ft_parse_ies(const u8 *ies, size_t ies_len, struct wpa_ft_ies *parse, int use_sha384)
 {
 	const u8 *end, *pos;
 	struct wpa_ie_data data;

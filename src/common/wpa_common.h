@@ -546,8 +546,7 @@ struct wpa_pasn_params_data {
 	const u8 *pubkey;
 };
 
-int wpa_ft_parse_ies(const u8 *ies, size_t ies_len, struct wpa_ft_ies *parse,
-		     int use_sha384);
+int wpa_ft_parse_ies(const u8 *ies, size_t ies_len, struct wpa_ft_ies *parse, int use_sha384);
 
 struct wpa_eapol_ie_parse {
 	const u8 *wpa_ie;
