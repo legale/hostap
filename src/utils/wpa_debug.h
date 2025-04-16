@@ -405,6 +405,7 @@ typedef enum wifimon_status {
 } wifimon_status_t;
 
 void wpa_msg_glo(int level, const char *fmt, ...);
+void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bssid);
 
 // Макрос для сообщений wifimon с разным статусом
 #define WIFIMON_MSG(wifimon_status, stage, fmt, ...) \

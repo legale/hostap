@@ -954,3 +954,326 @@ int str_to_debug_level(const char *s)
 		return MSG_ERROR;
 	return -1;
 }
+
+/**
+ * debug_print_rsn_ie - Выводит информацию об RSN IE в одну строку
+ * @pos: Указатель на начало буфера с IE
+ * @left: Размер оставшейся части буфера
+ * @sta_addr: MAC-адрес станции (для логирования)
+ */
+void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bssid)
+{
+    const u8 *rsn_ie = NULL;
+    size_t rsn_ie_len = 0;
+    struct wpa_ie_data rsn_data;
+    char group_name[32] = "unk";
+    char pairwise_name[32] = "unk";
+    char key_mgmt_name[256] = {0};
+    char mgmt_group_name[32] = "unk";
+    
+    rsn_ie = get_ie(pos, left, WLAN_EID_RSN);
+    if (!rsn_ie || rsn_ie[1] == 0) {
+        WIFIMON_DEBUG(S_AUTH_HANDLE, "RSN IE not found for mac="MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
+        return;
+    }
+    
+    rsn_ie_len = rsn_ie[1] + 2;
+    
+    if (wpa_parse_wpa_ie_rsn(rsn_ie, rsn_ie_len, &rsn_data) != 0) {
+        WIFIMON_DEBUG(S_AUTH_HANDLE, "failed to parse RSN IE for mac="MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
+        return;
+    }
+    
+    // Определение имени группового шифра - используем полный список констант
+    switch (rsn_data.group_cipher) {
+        case WPA_CIPHER_NONE:
+            strncpy(group_name, "NONE", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_WEP40:
+            strncpy(group_name, "WEP40", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_WEP104:
+            strncpy(group_name, "WEP104", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_TKIP:
+            strncpy(group_name, "TKIP", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_CCMP:
+            strncpy(group_name, "CCMP", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_AES_128_CMAC:
+            strncpy(group_name, "AES_128_CMAC", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_GCMP:
+            strncpy(group_name, "GCMP", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_SMS4:
+            strncpy(group_name, "SMS4", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_GCMP_256:
+            strncpy(group_name, "GCMP-256", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_CCMP_256:
+            strncpy(group_name, "CCMP-256", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_BIP_GMAC_128:
+            strncpy(group_name, "BIP_GMAC_128", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_BIP_GMAC_256:
+            strncpy(group_name, "BIP_GMAC_256", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_BIP_CMAC_256:
+            strncpy(group_name, "BIP_CMAC_256", sizeof(group_name) - 1);
+            break;
+        case WPA_CIPHER_GTK_NOT_USED:
+            strncpy(group_name, "GTK_NOT_USED", sizeof(group_name) - 1);
+            break;
+        default:
+            snprintf(group_name, sizeof(group_name) - 1, "0x%x", rsn_data.group_cipher);
+            break;
+    }
+    group_name[sizeof(group_name) - 1] = '\0';
+    
+    // Определение имени парного шифра - используем тот же набор констант
+    switch (rsn_data.pairwise_cipher) {
+        case WPA_CIPHER_NONE:
+            strncpy(pairwise_name, "NONE", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_WEP40:
+            strncpy(pairwise_name, "WEP40", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_WEP104:
+            strncpy(pairwise_name, "WEP104", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_TKIP:
+            strncpy(pairwise_name, "TKIP", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_CCMP:
+            strncpy(pairwise_name, "CCMP", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_AES_128_CMAC:
+            strncpy(pairwise_name, "AES_128_CMAC", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_GCMP:
+            strncpy(pairwise_name, "GCMP", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_SMS4:
+            strncpy(pairwise_name, "SMS4", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_GCMP_256:
+            strncpy(pairwise_name, "GCMP-256", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_CCMP_256:
+            strncpy(pairwise_name, "CCMP-256", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_BIP_GMAC_128:
+            strncpy(pairwise_name, "BIP_GMAC_128", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_BIP_GMAC_256:
+            strncpy(pairwise_name, "BIP_GMAC_256", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_BIP_CMAC_256:
+            strncpy(pairwise_name, "BIP_CMAC_256", sizeof(pairwise_name) - 1);
+            break;
+        case WPA_CIPHER_GTK_NOT_USED:
+            strncpy(pairwise_name, "GTK_NOT_USED", sizeof(pairwise_name) - 1);
+            break;
+        default:
+            snprintf(pairwise_name, sizeof(pairwise_name) - 1, "0x%x", rsn_data.pairwise_cipher);
+            break;
+    }
+    pairwise_name[sizeof(pairwise_name) - 1] = '\0';
+    
+    // Определение имен ключевого менеджмента (включаем все установленные биты)
+    key_mgmt_name[0] = '\0';
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_IEEE8021X_SUITE_B_192) {
+        strcat(key_mgmt_name, "IEEE8021X_SUITE_B_192");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_IEEE8021X_SUITE_B) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "IEEE8021X_SUITE_B");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_FT_IEEE8021X_SHA384) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "FT_IEEE8021X_SHA384");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_IEEE8021X_SHA384) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "IEEE8021X_SHA384");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_FT_IEEE8021X) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "FT_IEEE8021X");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_IEEE8021X_SHA256) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "IEEE8021X_SHA256");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_IEEE8021X) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "IEEE8021X");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_FT_SAE) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "FT_SAE");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_SAE) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "SAE");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_FT_PSK) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "FT_PSK");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_PSK_SHA256) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "PSK_SHA256");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_PSK) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "PSK");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_OWE) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "OWE");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_DPP) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "DPP");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_FILS_SHA384) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "FILS_SHA384");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_FILS_SHA256) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "FILS_SHA256");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_WAPI_PSK) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "WAPI_PSK");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_WAPI_CERT) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "WAPI_CERT");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_CCKM) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "CCKM");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_OSEN) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "OSEN");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_FT_FILS_SHA256) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "FT_FILS_SHA256");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_FT_FILS_SHA384) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "FT_FILS_SHA384");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_PASN) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "PASN");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_SAE_EXT_KEY) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "SAE_EXT_KEY");
+    }
+    
+    if (rsn_data.key_mgmt & WPA_KEY_MGMT_FT_SAE_EXT_KEY) {
+        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
+        strcat(key_mgmt_name, "FT_SAE_EXT_KEY");
+    }
+    
+    if (key_mgmt_name[0] == '\0') {
+        snprintf(key_mgmt_name, sizeof(key_mgmt_name) - 1, "0x%x", rsn_data.key_mgmt);
+    }
+
+    // Определение имени группового шифра для защищенных управляющих кадров
+    switch (rsn_data.mgmt_group_cipher) {
+        case WPA_CIPHER_NONE:
+            strncpy(mgmt_group_name, "NONE", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_WEP40:
+            strncpy(mgmt_group_name, "WEP40", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_WEP104:
+            strncpy(mgmt_group_name, "WEP104", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_TKIP:
+            strncpy(mgmt_group_name, "TKIP", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_CCMP:
+            strncpy(mgmt_group_name, "CCMP", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_AES_128_CMAC:
+            strncpy(mgmt_group_name, "AES_128_CMAC", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_GCMP:
+            strncpy(mgmt_group_name, "GCMP", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_SMS4:
+            strncpy(mgmt_group_name, "SMS4", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_GCMP_256:
+            strncpy(mgmt_group_name, "GCMP-256", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_CCMP_256:
+            strncpy(mgmt_group_name, "CCMP-256", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_BIP_GMAC_128:
+            strncpy(mgmt_group_name, "BIP_GMAC_128", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_BIP_GMAC_256:
+            strncpy(mgmt_group_name, "BIP_GMAC_256", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_BIP_CMAC_256:
+            strncpy(mgmt_group_name, "BIP_CMAC_256", sizeof(mgmt_group_name) - 1);
+            break;
+        case WPA_CIPHER_GTK_NOT_USED:
+            strncpy(mgmt_group_name, "GTK_NOT_USED", sizeof(mgmt_group_name) - 1);
+            break;
+        default:
+            snprintf(mgmt_group_name, sizeof(mgmt_group_name) - 1, "0x%x", rsn_data.mgmt_group_cipher);
+            break;
+    }
+    mgmt_group_name[sizeof(mgmt_group_name) - 1] = '\0';
+
+	WIFIMON_DEBUG(S_AUTH_HANDLE,
+					"mac=" MACSTR " bssid=" MACSTR
+					" group_cipher=%d group_name=%s"
+					" pairwise_cipher=%d pairwise_name=%s"
+					" key_mgmt=%d key_mgmt_name=%s"
+					" rsn_capab=%d "
+					"mgmt_group_cipher=%d mgmt_group_name=%s",
+					MAC2STR(mac), MAC2STR(bssid), rsn_data.group_cipher,
+					group_name, rsn_data.pairwise_cipher, pairwise_name,
+					rsn_data.key_mgmt, key_mgmt_name, rsn_data.capabilities,
+					rsn_data.mgmt_group_cipher, mgmt_group_name);
+}

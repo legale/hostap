@@ -796,6 +796,7 @@ eapol_auth_alloc(struct hostapd_data *hapd, struct eapol_authenticator *eapol, c
 			   "failed");
 		return NULL;
 	}
+	sm->hapd = hapd;
 	sm->radius_identifier = -1;
 	os_memcpy(sm->addr, addr, ETH_ALEN);
 	sm->flags = flags;
@@ -866,7 +867,6 @@ eapol_auth_alloc(struct hostapd_data *hapd, struct eapol_authenticator *eapol, c
 	}
 #endif /* CONFIG_NO_RADIUS */
 	
-	sm->hapd = hapd;
 	return sm;
 }
 

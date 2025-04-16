@@ -1327,6 +1327,7 @@ void ap_sta_set_authorized_event(struct hostapd_data *hapd, struct sta_info *sta
 				    ip_addr_buf[2], ip_addr_buf[3]);
 		}
 #endif /* CONFIG_P2P */
+		WIFIMON_OK(S_AUTHORIZED, "authorized=%d mac=" MACSTR " bssid=" MACSTR " %s", authorized, MAC2STR(sta->addr), MAC2STR(hapd->own_addr), ip_addr);
 
 		keyid = ap_sta_wpa_get_keyid(hapd, sta);
 		if (keyid) {
