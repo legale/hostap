@@ -106,6 +106,7 @@ struct eap_method {
  * struct eap_sm - EAP server state machine data
  */
 struct eap_sm {
+	struct hostapd_data *hapd;
 	enum {
 		EAP_DISABLED, EAP_INITIALIZE, EAP_IDLE, EAP_RECEIVED,
 		EAP_INTEGRITY_CHECK, EAP_METHOD_RESPONSE, EAP_METHOD_REQUEST,
