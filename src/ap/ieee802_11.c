@@ -6334,6 +6334,9 @@ static void handle_assoc(struct hostapd_data *hapd,
 	}
 #endif /* CONFIG_FILS */
 
+	//WIFIMON RELATED INFO
+	debug_print_rsn_ie(pos, left, mgmt->sa, hapd->own_addr);
+	
 	/* followed by SSID and Supported rates; and HT capabilities if 802.11n
 	 * is used */
 	resp = check_assoc_ies(hapd, sta, pos, left,
@@ -7145,107 +7148,7 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
 		WIFIMON_INF(S_AUTH_REQ, "frame=mgmt::auth_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d auth_alg=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.auth.auth_alg));
-			
-		/* Проверяем, является ли аутентификация FT-аутентификацией (auth_alg=2) */
-		if ((le_to_host16(mgmt->u.auth.auth_alg) != 2) || (len < IEEE80211_HDRLEN + sizeof(mgmt->u.auth))) {
-			WIFIMON_INF(S_UNK, "%s:%d auth_alg=%u", __func__, __LINE__, le_to_host16(mgmt->u.auth.auth_alg));
-		} else {
-			WIFIMON_INF(S_UNK, "%s:%d FIRST MSG", __func__, __LINE__);
-
-
-			struct wpa_ft_ies parse;
-			const u8 *ies = mgmt->u.auth.variable;
-			size_t ies_len = len - IEEE80211_HDRLEN - sizeof(mgmt->u.auth);
-			WIFIMON_INF(S_UNK, "%s:%d", __func__, __LINE__);
-			
-			/* Вызываем функцию парсинга FT IEs */
-			if (wpa_ft_parse_ies(ies, ies_len, &parse, -1, false) == 0) {
-				char debug_line[1024] = {0};
-				int offset = 0;
-				WIFIMON_INF(S_UNK, "%s:%d", __func__, __LINE__);
-				
-				/* Добавляем основные параметры */
-				offset += snprintf(debug_line + offset, sizeof(debug_line) - offset,
-								"ft_auth mac=" MACSTR " bssid=" MACSTR " stype=%d auth_alg=%u",
-								MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, 
-								le_to_host16(mgmt->u.auth.auth_alg));
-				
-				WIFIMON_INF(S_UNK, "%s:%d", __func__, __LINE__);
-				/* Информация о наличии элементов */
-				offset += snprintf(debug_line + offset, sizeof(debug_line) - offset,
-								" has_rsn=%d has_mdie=%d has_ftie=%d has_rsnxe=%d",
-								parse.rsn ? 1 : 0, parse.mdie ? 1 : 0, 
-								parse.ftie ? 1 : 0, parse.rsnxe ? 1 : 0);
-				
-				WIFIMON_INF(S_UNK, "%s:%d", __func__, __LINE__);
-				/* Парсинг и вывод SSID */
-				const u8 *ssid_ie = NULL;
-				u8 ssid_len = 0;
-				char ssid_txt[SSID_MAX_LEN + 1];
-				
-				ssid_ie = get_ie(ies, ies_len, WLAN_EID_SSID);
-				if (ssid_ie && ssid_ie[1] <= SSID_MAX_LEN) {
-					ssid_len = ssid_ie[1];
-					os_memcpy(ssid_txt, ssid_ie + 2, ssid_len);
-					ssid_txt[ssid_len] = '\0';
-					offset += snprintf(debug_line + offset, sizeof(debug_line) - offset,
-									" ssid=\"%s\"", ssid_txt);
-				}
-				
-				WIFIMON_INF(S_UNK, "%s:%d", __func__, __LINE__);
-				/* Детальный разбор MDIE */
-				if (parse.mdie && parse.mdie_len >= 3) {
-					u16 mdid = WPA_GET_LE16(parse.mdie);
-					u8 ft_over_ds = !!(parse.mdie[2] & 0x01);
-					u8 ft_resource_req = !!(parse.mdie[2] & 0x02);
-					
-					offset += snprintf(debug_line + offset, sizeof(debug_line) - offset,
-									" mdid=0x%04x ft_over_ds=%d ft_resource_req=%d", 
-									mdid, ft_over_ds, ft_resource_req);
-				}
-				
-				WIFIMON_INF(S_UNK, "%s:%d", __func__, __LINE__);
-				/* Вывод R0KH-ID и R1KH-ID, если они присутствуют */
-				if (parse.r0kh_id && parse.r0kh_id_len > 0) {
-					char r0kh_id_hex[2*FT_R0KH_ID_MAX_LEN + 1];
-					wpa_snprintf_hex(r0kh_id_hex, sizeof(r0kh_id_hex), 
-									parse.r0kh_id, parse.r0kh_id_len);
-					offset += snprintf(debug_line + offset, sizeof(debug_line) - offset,
-									" r0kh_id=%s", r0kh_id_hex);
-				}
-				
-				if (parse.r1kh_id) {
-					char r1kh_id_hex[2*FT_R1KH_ID_LEN + 1];
-					wpa_snprintf_hex(r1kh_id_hex, sizeof(r1kh_id_hex), 
-									parse.r1kh_id, FT_R1KH_ID_LEN);
-					offset += snprintf(debug_line + offset, sizeof(debug_line) - offset,
-									" r1kh_id=%s", r1kh_id_hex);
-				}
-				
-				WIFIMON_INF(S_UNK, "%s:%d", __func__, __LINE__);
-				/* Вывод Nonces */
-				if (parse.fte_anonce && parse.fte_snonce) {
-					char anonce_hex[2*WPA_NONCE_LEN + 1];
-					char snonce_hex[2*WPA_NONCE_LEN + 1];
-					
-					wpa_snprintf_hex(anonce_hex, sizeof(anonce_hex), 
-									parse.fte_anonce, WPA_NONCE_LEN);
-					wpa_snprintf_hex(snonce_hex, sizeof(snonce_hex), 
-									parse.fte_snonce, WPA_NONCE_LEN);
-					
-					offset += snprintf(debug_line + offset, sizeof(debug_line) - offset,
-									" anonce=%s snonce=%s", anonce_hex, snonce_hex);
-				}
-				
-				WIFIMON_INF(S_UNK, "%s:%d", __func__, __LINE__);
-				/* Выводим всё в одной строке */
-				WIFIMON_INF(S_AUTH_HANDLE, "%s", debug_line);
-			}
-		}
 		break;
-
-
-
 	case WLAN_FC_STYPE_ASSOC_REQ:
 		WIFIMON_INF(S_ASSOC_REQ, "frame=mgmt::assoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.assoc_req.capab_info));
 		break;

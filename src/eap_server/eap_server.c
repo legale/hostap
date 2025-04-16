@@ -20,8 +20,15 @@
 #include "state_machine.h"
 #include "common/wpa_ctrl.h"
 
+#include "eapol_auth/eapol_auth_sm.h"
+#include "eapol_auth/eapol_auth_sm_i.h"
+#include "ap/hostapd.h"
+
 #define STATE_MACHINE_DATA struct eap_sm
 #define STATE_MACHINE_DEBUG_PREFIX "EAP"
+#define STATE_MACHINE_HAPD ((struct eapol_state_machine *)sm->eapol_ctx)->hapd
+
+static u8 zeromac[ETH_ALEN] = {0};
 
 /* EAP state machines are described in RFC 4137 */
 
@@ -267,9 +274,8 @@ SM_STATE(EAP, INITIALIZE)
 	sm->num_rounds = 0;
 	sm->num_rounds_short = 0;
 	sm->method_pending = METHOD_PENDING_NONE;
-
-	wpa_msg(sm->cfg->msg_ctx, MSG_INFO, WPA_EVENT_EAP_STARTED
-		MACSTR, MAC2STR(sm->peer_addr));
+	WIFIMON_INF(S_AUTH_HANDLE_RADIUS, "WPA_EVENT_EAP_STARTED mac=" MACSTR " bssid=" MACSTR, MAC2STR(sm->peer_addr), MAC2STR(STATE_MACHINE_HAPD ? STATE_MACHINE_HAPD->own_addr : zeromac));
+	wpa_msg(sm->cfg->msg_ctx, MSG_INFO, WPA_EVENT_EAP_STARTED MACSTR, MAC2STR(sm->peer_addr));
 }
 
 
