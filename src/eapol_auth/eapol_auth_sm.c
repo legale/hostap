@@ -807,6 +807,7 @@ eapol_auth_alloc(struct hostapd_data *hapd, struct eapol_authenticator *eapol, c
 			   "failed");
 		return NULL;
 	}
+	sm->hapd = hapd;
 	sm->radius_identifier = -1;
 	os_memcpy(sm->addr, addr, ETH_ALEN);
 	sm->flags = flags;
@@ -972,6 +973,7 @@ restart:
 					   "but no aaaEapRespData available");
 				return;
 			}
+			WIFIMON_DEBUG(S_UNK, "%s", __func__);
 			sm->eapol->cb.aaa_send(
 				sm->eapol->conf.ctx, sm->sta,
 				wpabuf_head(sm->eap_if->aaaEapRespData),

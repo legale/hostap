@@ -744,7 +744,7 @@ void ieee802_1x_encapsulate_radius(struct hostapd_data *hapd,
 				   struct sta_info *sta,
 				   const u8 *eap, size_t len)
 {
-	wpa_msg(hapd->msg_ctx, MSG_INFO, "%s", __func__);
+	WIFIMON_DEBUG(S_UNK, "%s", __func__);
 	struct radius_msg *msg;
 	struct eapol_state_machine *sm = sta->eapol_sm;
 
@@ -2362,7 +2362,7 @@ static void ieee802_1x_aaa_send(void *ctx, void *sta_ctx,
 #ifndef CONFIG_NO_RADIUS
 	struct hostapd_data *hapd = ctx;
 	struct sta_info *sta = sta_ctx;
-
+	WIFIMON_DEBUG(S_UNK, "%s", __func__);
 	ieee802_1x_encapsulate_radius(hapd, sta, data, datalen);
 #endif /* CONFIG_NO_RADIUS */
 }
