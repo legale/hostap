@@ -1026,6 +1026,7 @@ int wnm_send_bss_tm_req(struct hostapd_data *hapd, struct sta_info *sta,
 		os_free(buf);
 		return -1;
 	}
+	wpa_hexdump(MSG_INFO, "BSS_TM_REQ FRAME", buf, pos - buf);
 	os_free(buf);
 
 	if (disassoc_timer) {
