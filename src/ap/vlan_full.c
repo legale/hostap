@@ -605,12 +605,8 @@ void vlan_dellink(const char *ifname, struct hostapd_data *hapd)
 			vlan_put_bridge(br_name, hapd, tagged[i]);
 		}
 
-		if (!notempty) {
-			/* Non-VLAN STA */
-			if (hapd->conf->bridge[0] &&
-			    (vlan->clean & DVLAN_CLEAN_WLAN_PORT))
-				br_delif(hapd->conf->bridge, ifname);
-		} else if (untagged > 0 && untagged <= MAX_VLAN_ID) {
+		//br_delif(hapd->conf->bridge, ifname); REMOVED
+		if (untagged > 0 && untagged <= MAX_VLAN_ID) {
 			vlan_bridge_name(br_name, hapd, vlan, untagged);
 
 			if (vlan->clean & DVLAN_CLEAN_WLAN_PORT)
