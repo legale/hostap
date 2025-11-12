@@ -13,6 +13,14 @@
 /* Avoid conflicts due to NetBSD net/if.h if_type define with driver.h */
 #undef if_type
 #include <sys/ioctl.h>
+#include <syslog.h>
+#include <unistd.h> // readlink, close
+#include <limits.h> // PATH_MAX
+#include <string.h> // strcmp, strncmp
+#include <errno.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <net/if.h>
 
 #include "utils/common.h"
 #include "drivers/priv_netlink.h"
@@ -177,6 +185,49 @@ done:
 	return 0;
 }
 
+/*
+	check if 'if_name' is in the bridge 'br_name'
+	returns 0 if the interface is already part of the bridge
+	returns 1 if interface is not exists
+	returns -1 if interface exists but not in the bridge
+*/
+static int if_in_bridge(const char *br_name, const char *if_name)
+{
+	char path[PATH_MAX];
+	char linkbuf[PATH_MAX];
+	ssize_t n;
+	int r;
+
+	// check interface existence
+	r = snprintf(path, sizeof(path), "/sys/class/net/%s", if_name);
+	if (r < 0 || r >= (int)sizeof(path))
+		return -1; // path too long
+	if (access(path, F_OK) != 0)
+		return 1; // interface not exists
+
+	// read master symlink
+	r = snprintf(path, sizeof(path), "/sys/class/net/%s/master", if_name);
+	if (r < 0 || r >= (int)sizeof(path))
+		return -1; // path too long
+
+	n = readlink(path, linkbuf, sizeof(linkbuf) - 1);
+	if (n < 0)
+		return -1; // exists but no master
+
+	linkbuf[n] = '\0';
+
+	// compare bridge name with symlink tail
+	const char *p = strrchr(linkbuf, '/');
+	if (p)
+		p++;
+	else
+		p = linkbuf;
+
+	if (strcmp(p, br_name) == 0)
+		return 0; // already part of the bridge
+
+	return -1; // enslaved but to a different bridge
+}
 
 /*
 	Add interface 'if_name' to the bridge 'br_name'
@@ -198,6 +249,11 @@ static int br_addif(const char *br_name, const char *if_name)
 			   "failed: %s", __func__, strerror(errno));
 		return -1;
 	}
+
+	//interface is already in the bridge, nothing to do
+	int rc = if_in_bridge(br_name,if_name);
+	syslog(1, "[vlan_dbg] if_in_bridge br=%s iface=%s rc=%d", br_name, if_name, rc);
+	if(rc == 0) return 1;
 
 	if (linux_br_add_if(fd, br_name, if_name) == 0)
 		goto done;
@@ -241,6 +297,7 @@ done:
 	close(fd);
 	return 0;
 }
+
 
 
 static int br_delbr(const char *br_name)
@@ -412,8 +469,9 @@ static void vlan_newlink_tagged(int vlan_naming, const char *tagged_interface,
 	if (!vlan_add(tagged_interface, vid, vlan_ifname))
 		clean |= DVLAN_CLEAN_VLAN;
 
-	if (!br_addif(br_name, vlan_ifname))
-		clean |= DVLAN_CLEAN_VLAN_PORT;
+	int rc = br_addif(br_name, vlan_ifname);
+	syslog(1, "[vlan_dbg] br_addif br=%s iface=%s rc=%d\n", br_name, vlan_ifname, rc);
+	if (!ret) clean |= DVLAN_CLEAN_VLAN_PORT;
 
 	dyn_iface_get(hapd, vlan_ifname, clean);
 
@@ -539,8 +597,10 @@ static void vlan_dellink_tagged(int vlan_naming, const char *tagged_interface,
 
 	clean = dyn_iface_put(hapd, vlan_ifname);
 
-	if (clean & DVLAN_CLEAN_VLAN_PORT)
+	if (clean & DVLAN_CLEAN_VLAN_PORT){
+		syslog(1,"[vlan_dbg] %d DVLAN_CLEAN_VLAN_PORT br=%s iface=%s\n", __LINE__, br_name, vlan_ifname);
 		br_delif(br_name, vlan_ifname);
+	}
 
 	if (clean & DVLAN_CLEAN_VLAN) {
 		ifconfig_down(vlan_ifname);
@@ -605,12 +665,20 @@ void vlan_dellink(const char *ifname, struct hostapd_data *hapd)
 			vlan_put_bridge(br_name, hapd, tagged[i]);
 		}
 
-		//br_delif(hapd->conf->bridge, ifname); REMOVED
-		if (untagged > 0 && untagged <= MAX_VLAN_ID) {
+		if (!notempty) {
+				/* Non-VLAN STA */
+				if (hapd->conf->bridge[0] &&
+					(vlan->clean & DVLAN_CLEAN_WLAN_PORT))
+						br_delif(hapd->conf->bridge, ifname);
+		} else if (untagged > 0 && untagged <= MAX_VLAN_ID) {
 			vlan_bridge_name(br_name, hapd, vlan, untagged);
 
-			if (vlan->clean & DVLAN_CLEAN_WLAN_PORT)
+
+			if (vlan->clean & DVLAN_CLEAN_WLAN_PORT){
+				syslog(1,"[vlan_dbg] %d DVLAN_CLEAN_WLAN_PORT br=%s iface=%s\n", __LINE__, br_name, vlan->ifname);
 				br_delif(br_name, vlan->ifname);
+			}
+
 
 			vlan_put_bridge(br_name, hapd, untagged);
 		}
