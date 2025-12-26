@@ -55,6 +55,12 @@ struct wpa_state_machine {
 	bool MICVerified;
 	bool GUpdateStationKeys;
 	u8 ANonce[WPA_NONCE_LEN];
+#ifdef CONFIG_IEEE80211R_AP
+	u8 prev_ANonce[WPA_NONCE_LEN]; /* Previous ANonce for FT to handle
+					* cases where client uses ANonce from
+					* an earlier FT Authentication Response */
+	bool prev_ANonce_valid; /* Whether prev_ANonce contains valid data */
+#endif /* CONFIG_IEEE80211R_AP */
 	u8 SNonce[WPA_NONCE_LEN];
 	u8 alt_SNonce[WPA_NONCE_LEN];
 	u8 alt_replay_counter[WPA_REPLAY_COUNTER_LEN];

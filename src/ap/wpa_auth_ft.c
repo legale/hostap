@@ -3314,6 +3314,18 @@ pmk_r1_derived:
 	os_memcpy(sm->pmk_r1, pmk_r1, pmk_r1_len);
 	sm->pmk_r1_len = pmk_r1_len;
 
+	/* Save previous ANonce before generating a new one to handle cases
+	 * where client uses ANonce from an earlier FT Authentication Response */
+	{
+		u8 zero_nonce[WPA_NONCE_LEN];
+		os_memset(zero_nonce, 0, WPA_NONCE_LEN);
+		if (os_memcmp(sm->ANonce, zero_nonce, WPA_NONCE_LEN) != 0) {
+			os_memcpy(sm->prev_ANonce, sm->ANonce, WPA_NONCE_LEN);
+			sm->prev_ANonce_valid = 1;
+			wpa_printf(MSG_DEBUG, "FT: Saved previous ANonce");
+		}
+	}
+
 	if (random_get_bytes(sm->ANonce, WPA_NONCE_LEN)) {
 		wpa_printf(MSG_DEBUG, "FT: Failed to get random data for "
 			   "ANonce");
@@ -3498,6 +3510,11 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 	size_t kck_len;
 	struct wpa_auth_config *conf;
 	int retval = WLAN_STATUS_UNSPECIFIED_FAILURE;
+	u8 saved_ANonce[WPA_NONCE_LEN];
+	struct wpa_ptk saved_PTK;
+	u8 ptk_name[WPA_PMK_NAME_LEN];
+	bool using_prev_anonce = false;
+	bool ptk_saved = false;
 
 	if (sm == NULL)
 		return WLAN_STATUS_UNSPECIFIED_FAILURE;
@@ -3569,14 +3586,67 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 		goto out;
 	}
 
+	/* Check if ANonce matches current or previous one. If it matches
+	 * previous, temporarily use previous ANonce for PTK recalculation
+	 * and MIC verification. */
 	if (os_memcmp(parse.fte_anonce, sm->ANonce, WPA_NONCE_LEN) != 0) {
-		wpa_printf(MSG_DEBUG, "FT: ANonce mismatch in FTIE");
-		wpa_hexdump(MSG_DEBUG, "FT: Received ANonce",
-			    parse.fte_anonce, WPA_NONCE_LEN);
-		wpa_hexdump(MSG_DEBUG, "FT: Expected ANonce",
-			    sm->ANonce, WPA_NONCE_LEN);
-		retval = WLAN_STATUS_INVALID_FTIE;
-		goto out;
+		if (sm->prev_ANonce_valid &&
+		    os_memcmp(parse.fte_anonce, sm->prev_ANonce,
+			      WPA_NONCE_LEN) == 0) {
+			/* ANonce matches previous one - client is using
+			 * ANonce from an earlier FT Authentication Response.
+			 * Save current ANonce and PTK, use previous ANonce
+			 * for PTK recalculation and MIC verification. */
+			wpa_printf(MSG_DEBUG, "FT: Using previous ANonce from "
+				   "earlier FT Authentication Response");
+			wpa_hexdump(MSG_DEBUG, "FT: Previous ANonce",
+				    sm->prev_ANonce, WPA_NONCE_LEN);
+			os_memcpy(saved_ANonce, sm->ANonce, WPA_NONCE_LEN);
+			saved_PTK = sm->PTK;
+			ptk_saved = true;
+			os_memcpy(sm->ANonce, sm->prev_ANonce, WPA_NONCE_LEN);
+			using_prev_anonce = true;
+
+			/* Recalculate PTK with previous ANonce */
+			int kdk_len;
+			if (sm->wpa_auth->conf.force_kdk_derivation ||
+			    (sm->wpa_auth->conf.secure_ltf &&
+			     ieee802_11_rsnx_capab(sm->rsnxe,
+						   WLAN_RSNX_CAPAB_SECURE_LTF)))
+				kdk_len = WPA_KDK_MAX_LEN;
+			else
+				kdk_len = 0;
+
+				if (wpa_pmk_r1_to_ptk(sm->pmk_r1, sm->pmk_r1_len,
+						      sm->SNonce, sm->ANonce,
+						      sm->addr, sm->wpa_auth->addr,
+						      sm->pmk_r1_name, &sm->PTK,
+						      ptk_name, sm->wpa_key_mgmt,
+						      sm->pairwise, kdk_len) < 0) {
+				wpa_printf(MSG_DEBUG,
+					   "FT: Failed to recalculate PTK "
+					   "with previous ANonce");
+				/* Restore original ANonce and PTK */
+				os_memcpy(sm->ANonce, saved_ANonce,
+					  WPA_NONCE_LEN);
+				if (ptk_saved)
+					sm->PTK = saved_PTK;
+				retval = WLAN_STATUS_INVALID_FTIE;
+				goto out;
+			}
+		} else {
+			wpa_printf(MSG_DEBUG, "FT: ANonce mismatch in FTIE");
+			wpa_hexdump(MSG_DEBUG, "FT: Received ANonce",
+				    parse.fte_anonce, WPA_NONCE_LEN);
+			wpa_hexdump(MSG_DEBUG, "FT: Expected ANonce",
+				    sm->ANonce, WPA_NONCE_LEN);
+			if (sm->prev_ANonce_valid) {
+				wpa_hexdump(MSG_DEBUG, "FT: Previous ANonce",
+					    sm->prev_ANonce, WPA_NONCE_LEN);
+			}
+			retval = WLAN_STATUS_INVALID_FTIE;
+			goto out;
+		}
 	}
 
 	if (parse.r0kh_id == NULL) {
@@ -3729,6 +3799,15 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 
 	retval = WLAN_STATUS_SUCCESS;
 out:
+	/* If we used previous ANonce and there was an error, restore
+	 * original ANonce and PTK. If successful, keep the new PTK
+	 * calculated with previous ANonce. */
+	if (using_prev_anonce && retval != WLAN_STATUS_SUCCESS && ptk_saved) {
+		os_memcpy(sm->ANonce, saved_ANonce, WPA_NONCE_LEN);
+		sm->PTK = saved_PTK;
+		wpa_printf(MSG_DEBUG, "FT: Restored original ANonce and PTK "
+			   "after validation failure with previous ANonce");
+	}
 	wpa_ft_parse_ies_free(&parse);
 	return retval;
 }
