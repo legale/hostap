@@ -119,10 +119,15 @@ OBJS_p = wpa_passphrase.o
 OBJS_p += ../src/utils/common.o
 OBJS_p += ../src/utils/wpa_debug.o
 OBJS_p += ../src/utils/wpabuf.o
+OBJS_p += ../src/common/ieee802_11_common.o
+OBJS_p += ../src/common/wpa_common.o
 OBJS_c = wpa_cli.o ../src/common/wpa_ctrl.o
 OBJS_c += ../src/utils/wpa_debug.o
 OBJS_c += ../src/utils/common.o
 OBJS_c += ../src/common/cli.o
+OBJS_c += ../src/utils/wpabuf.o
+OBJS_c += ../src/common/ieee802_11_common.o
+OBJS_c += ../src/common/wpa_common.o
 
 ifndef CONFIG_OS
 ifdef CONFIG_NATIVE_WINDOWS
@@ -1228,6 +1233,7 @@ OBJS += ../src/crypto/tls_openssl_ocsp.o
 LIBS += -lssl
 endif
 OBJS += ../src/crypto/crypto_openssl.o
+OBJS_c += ../src/crypto/crypto_openssl.o
 OBJS_p += ../src/crypto/crypto_openssl.o
 OBJS_priv += ../src/crypto/crypto_openssl.o
 ifdef NEED_FIPS186_2_PRF
@@ -1235,6 +1241,7 @@ OBJS += ../src/crypto/fips_prf_openssl.o
 endif
 NEED_TLS_PRF_SHA256=y
 LIBS += -lcrypto
+LIBS_c += -lcrypto
 LIBS_p += -lcrypto
 ifdef CONFIG_TLS_ADD_DL
 LIBS += -ldl
@@ -1256,6 +1263,7 @@ OBJS += ../src/crypto/tls_gnutls.o
 LIBS += -lgnutls -lgpg-error
 endif
 OBJS += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
+OBJS_c += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
 OBJS_p += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
 OBJS_priv += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
 ifdef NEED_FIPS186_2_PRF
@@ -1515,6 +1523,7 @@ endif
 endif
 endif
 SHA1OBJS += ../src/crypto/sha1-prf.o
+OBJS_c += ../src/crypto/sha1-prf.o
 ifdef CONFIG_INTERNAL_SHA1
 SHA1OBJS += ../src/crypto/sha1-internal.o
 ifdef NEED_FIPS186_2_PRF
@@ -1609,6 +1618,7 @@ endif
 endif
 endif
 SHA256OBJS += ../src/crypto/sha256-prf.o
+OBJS_c += ../src/crypto/sha256-prf.o
 ifdef CONFIG_INTERNAL_SHA256
 SHA256OBJS += ../src/crypto/sha256-internal.o
 endif
@@ -1651,6 +1661,7 @@ endif
 endif
 CFLAGS += -DCONFIG_SHA384
 OBJS += ../src/crypto/sha384-prf.o
+OBJS_c += ../src/crypto/sha384-prf.o
 endif
 ifdef NEED_SHA512
 ifneq ($(CONFIG_TLS), openssl)
@@ -1664,6 +1675,7 @@ endif
 endif
 CFLAGS += -DCONFIG_SHA512
 OBJS += ../src/crypto/sha512-prf.o
+OBJS_c += ../src/crypto/sha512-prf.o
 endif
 
 ifdef NEED_ASN1
@@ -1848,6 +1860,8 @@ OBJS += $(SHA1OBJS) $(DESOBJS)
 
 OBJS_p += $(SHA1OBJS)
 OBJS_p += $(SHA256OBJS)
+OBJS_p += ../src/crypto/sha384-prf.o
+OBJS_p += ../src/crypto/sha512-prf.o
 OBJS_priv += $(SHA1OBJS)
 
 ifdef CONFIG_BGSCAN_SIMPLE
