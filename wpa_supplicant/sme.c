@@ -3166,6 +3166,13 @@ int sme_update_ft_ies(struct wpa_supplicant *wpa_s, const u8 *md,
 
 	os_memcpy(wpa_s->sme.mobility_domain, md, MOBILITY_DOMAIN_ID_LEN);
 	wpa_hexdump(MSG_DEBUG, "SME: FT IEs", ies, ies_len);
+	if (wpa_s->sme.ft_ies) {
+		wpa_printf(MSG_DEBUG, "SME: replaced IEs (old len=%zu, new len=%zu)",
+			   wpa_s->sme.ft_ies_len, ies_len);
+		wpa_hexdump(MSG_DEBUG, "SME: old IEs", wpa_s->sme.ft_ies, wpa_s->sme.ft_ies_len);
+		wpa_hexdump(MSG_DEBUG, "SME: new IEs", ies, ies_len);
+	}
+
 	os_free(wpa_s->sme.ft_ies);
 	wpa_s->sme.ft_ies = os_memdup(ies, ies_len);
 	if (wpa_s->sme.ft_ies == NULL)
