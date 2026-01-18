@@ -5,6 +5,7 @@ include ../../src/build.rules
 CFLAGS += -I../../src/utils
 CFLAGS += -I../../src/common
 CFLAGS += -I../../src
+CFLAGS += -DCONFIG_CRYPTO_INTERNAL
 
 ifndef CONFIG_NO_BROWSER
 ifndef CONFIG_BROWSER_SYSTEM
@@ -34,7 +35,6 @@ CFLAGS += -DCONFIG_NO_BROWSER
 else
 ifdef CONFIG_BROWSER_SYSTEM
 OBJS += ../../src/utils/eloop.o
-OBJS += ../../src/utils/wpabuf.o
 OBJS += ../../src/wps/httpread.o
 OBJS += ../../src/wps/http_server.o
 OBJS += ../../src/utils/browser-system.o
@@ -49,10 +49,24 @@ OBJS += ../../src/utils/os_unix.o
 CFLAGS += -DCONFIG_DEBUG_FILE
 OBJS += ../../src/utils/wpa_debug.o
 OBJS += ../../src/utils/common.o
+OBJS += ../../src/utils/wpabuf.o
+OBJS += ../../src/common/ieee802_11_common.o
+OBJS += ../../src/common/wpa_common.o
 OBJS += ../../src/crypto/crypto_internal.o
+OBJS += ../../src/crypto/md5.o
 OBJS += ../../src/crypto/md5-internal.o
+OBJS += ../../src/crypto/sha1.o
 OBJS += ../../src/crypto/sha1-internal.o
+OBJS += ../../src/crypto/sha1-prf.o
+OBJS += ../../src/crypto/sha256.o
 OBJS += ../../src/crypto/sha256-internal.o
+OBJS += ../../src/crypto/sha256-prf.o
+OBJS += ../../src/crypto/aes-internal.o
+OBJS += ../../src/crypto/aes-internal-enc.o
+OBJS += ../../src/crypto/aes-internal-dec.o
+OBJS += ../../src/crypto/aes-encblock.o
+OBJS += ../../src/crypto/aes-wrap.o
+OBJS += ../../src/crypto/aes-omac1.o
 
 CFLAGS += $(shell xml2-config --cflags)
 LIBS += $(shell xml2-config --libs)
