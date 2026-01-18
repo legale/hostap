@@ -9,19 +9,30 @@ CFLAGS += -DCONFIG_CRYPTO_INTERNAL
 
 ifndef CONFIG_NO_BROWSER
 ifndef CONFIG_BROWSER_SYSTEM
-TEST_WK := $(shell pkg-config --silence-errors --cflags webkitgtk-3.0)
+TEST_WK := $(shell pkg-config --silence-errors --cflags webkitgtk-3.0 2>/dev/null)
 ifeq ($(TEST_WK),)
 # Try webkit2
-GTKCFLAGS := $(shell pkg-config --cflags gtk+-3.0 webkit2gtk-4.0)
-GTKLIBS := $(shell pkg-config --libs gtk+-3.0 webkit2gtk-4.0)
+GTKCFLAGS := $(shell pkg-config --cflags gtk+-3.0 webkit2gtk-4.0 2>/dev/null)
+GTKLIBS := $(shell pkg-config --libs gtk+-3.0 webkit2gtk-4.0 2>/dev/null)
+ifneq ($(GTKCFLAGS),)
 CFLAGS += -DUSE_WEBKIT2
-else
-GTKCFLAGS := $(shell pkg-config --cflags gtk+-3.0 webkitgtk-3.0)
-GTKLIBS := $(shell pkg-config --libs gtk+-3.0 webkitgtk-3.0)
-endif
-
 CFLAGS += $(GTKCFLAGS)
 LIBS += $(GTKLIBS)
+else
+# GTK not available, use browser-system instead
+CONFIG_BROWSER_SYSTEM := y
+endif
+else
+GTKCFLAGS := $(shell pkg-config --cflags gtk+-3.0 webkitgtk-3.0 2>/dev/null)
+GTKLIBS := $(shell pkg-config --libs gtk+-3.0 webkitgtk-3.0 2>/dev/null)
+ifneq ($(GTKCFLAGS),)
+CFLAGS += $(GTKCFLAGS)
+LIBS += $(GTKLIBS)
+else
+# GTK not available, use browser-system instead
+CONFIG_BROWSER_SYSTEM := y
+endif
+endif
 endif
 endif
 
