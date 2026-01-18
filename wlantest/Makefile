@@ -62,10 +62,14 @@ TOBJS += tkip.o
 TOBJS += wep.o
 TOBJS += bip.o
 TOBJS += gcmp.o
+TOBJS += ../src/common/ieee802_11_common.o
+TOBJS += ../src/common/wpa_common.o
 
 
 OBJS_cli = wlantest_cli.o
 OBJS_cli += ../src/common/cli.o
+OBJS_cli += ../src/common/ieee802_11_common.o
+OBJS_cli += ../src/common/wpa_common.o
 
 _OBJS_VAR := OBJS
 include ../src/objs.mk
