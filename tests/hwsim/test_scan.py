@@ -96,6 +96,18 @@ def test_scan(dev, apdev):
     check_scan(dev[0], "freq=2457 non_coloc_6ghz=1 use_id=1")
 
 @remote_compatible
+def test_scan_duration(dev, apdev):
+    """Control interface behavior on scan duration parameter"""
+    hostapd.add_ap(apdev[0], {"ssid": "test-scan"})
+    bssid = apdev[0]['bssid']
+
+    logger.info("Single-channel scan with duration")
+    check_scan(dev[0], "freq=2412 duration=100 use_id=1")
+
+    logger.info("Single-channel scan with duration_mandatory")
+    check_scan(dev[0], "freq=2412 duration=50 duration_mandatory=1 use_id=1")
+
+@remote_compatible
 def test_scan_tsf(dev, apdev):
     """Scan and TSF updates from Beacon/Probe Response frames"""
     hostapd.add_ap(apdev[0], {"ssid": "test-scan",

@@ -1488,6 +1488,15 @@ ssid_list_set:
 		params.non_coloc_6ghz = 1;
 	}
 
+	if (wpa_s->last_scan_req == MANUAL_SCAN_REQ &&
+	    wpa_s->manual_scan_duration) {
+		params.duration = wpa_s->manual_scan_duration;
+		params.duration_mandatory = wpa_s->manual_scan_duration_mandatory;
+		wpa_dbg(wpa_s, MSG_DEBUG, "Set scan duration to %u TUs%s",
+			params.duration,
+			params.duration_mandatory ? " (mandatory)" : "");
+	}
+
 	scan_params = &params;
 
 scan:

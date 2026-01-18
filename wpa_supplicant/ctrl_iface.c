@@ -9260,6 +9260,8 @@ static void wpas_ctrl_scan(struct wpa_supplicant *wpa_s, char *params,
 	unsigned int scan_only = 0;
 	unsigned int scan_id_count = 0;
 	unsigned int manual_non_coloc_6ghz = 0;
+	u16 manual_scan_duration = 0;
+	unsigned int manual_scan_duration_mandatory = 0;
 	int scan_id[MAX_SCAN_ID];
 	void (*scan_res_handler)(struct wpa_supplicant *wpa_s,
 				 struct wpa_scan_results *scan_res);
@@ -9341,6 +9343,14 @@ static void wpas_ctrl_scan(struct wpa_supplicant *wpa_s, char *params,
 		if (pos)
 			manual_non_coloc_6ghz = !!atoi(pos + 15);
 
+		pos = os_strstr(params, "duration=");
+		if (pos)
+			manual_scan_duration = (u16)atoi(pos + 9);
+
+		pos = os_strstr(params, "duration_mandatory=");
+		if (pos)
+			manual_scan_duration_mandatory = !!atoi(pos + 19);
+
 		pos = params;
 		while (pos && *pos != '\0') {
 			if (os_strncmp(pos, "ssid ", 5) == 0) {
@@ -9411,6 +9421,8 @@ static void wpas_ctrl_scan(struct wpa_supplicant *wpa_s, char *params,
 		wpa_s->manual_scan_only_new = manual_scan_only_new;
 		wpa_s->scan_id_count = scan_id_count;
 		wpa_s->manual_non_coloc_6ghz = manual_non_coloc_6ghz;
+		wpa_s->manual_scan_duration = manual_scan_duration;
+		wpa_s->manual_scan_duration_mandatory = manual_scan_duration_mandatory;
 		os_memcpy(wpa_s->scan_id, scan_id, scan_id_count * sizeof(int));
 		wpa_s->scan_res_handler = scan_res_handler;
 		os_free(wpa_s->manual_scan_freqs);
@@ -9435,6 +9447,8 @@ static void wpas_ctrl_scan(struct wpa_supplicant *wpa_s, char *params,
 		wpa_s->manual_scan_only_new = manual_scan_only_new;
 		wpa_s->scan_id_count = scan_id_count;
 		wpa_s->manual_non_coloc_6ghz = manual_non_coloc_6ghz;
+		wpa_s->manual_scan_duration = manual_scan_duration;
+		wpa_s->manual_scan_duration_mandatory = manual_scan_duration_mandatory;
 		os_memcpy(wpa_s->scan_id, scan_id, scan_id_count * sizeof(int));
 		wpa_s->scan_res_handler = scan_res_handler;
 		os_free(wpa_s->manual_scan_freqs);

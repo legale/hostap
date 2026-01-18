@@ -1177,7 +1177,7 @@ class WpaSupplicant:
         return id
 
     def scan(self, type=None, freq=None, no_wait=False, only_new=False,
-             passive=False, timeout=15):
+             passive=False, timeout=15, duration=None, duration_mandatory=False):
         if not no_wait:
             self.dump_monitor()
         if type:
@@ -1190,6 +1190,10 @@ class WpaSupplicant:
             cmd += " only_new=1"
         if passive:
             cmd += " passive=1"
+        if duration is not None:
+            cmd += " duration=" + str(duration)
+        if duration_mandatory:
+            cmd += " duration_mandatory=1"
         if not no_wait:
             self.dump_monitor()
         res = self.request(cmd)

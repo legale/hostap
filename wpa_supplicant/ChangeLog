@@ -1,6 +1,10 @@
 ChangeLog for wpa_supplicant
 
 2024-07-20 - v2.11
+	* added duration parameter to SCAN command
+	  - "SCAN duration=<TUs>" can be used to set dwell time on each channel
+	  - "SCAN duration_mandatory=1" makes the duration mandatory
+	  - Duration is specified in TUs (Time Units, 1024 microseconds per TU)
 	* Wi-Fi Easy Connect
 	  - add support for DPP release 3
 	  - allow Configurator parameters to be provided during config exchange
