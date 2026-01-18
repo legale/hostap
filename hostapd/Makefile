@@ -1375,6 +1375,12 @@ NOBJS += ../src/utils/trace.o
 endif
 
 HOBJS += hlr_auc_gw.o ../src/utils/common.o ../src/utils/wpa_debug.o ../src/utils/os_$(CONFIG_OS).o ../src/utils/wpabuf.o ../src/crypto/milenage.o
+HOBJS += ../src/common/ieee802_11_common.o
+HOBJS += ../src/common/wpa_common.o
+HOBJS += ../src/crypto/sha1-prf.o
+HOBJS += ../src/crypto/sha256-prf.o
+HOBJS += ../src/crypto/sha384-prf.o
+HOBJS += ../src/crypto/sha512-prf.o
 HOBJS += ../src/crypto/aes-encblock.o
 ifdef CONFIG_INTERNAL_AES
 HOBJS += ../src/crypto/aes-internal.o
