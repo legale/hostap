@@ -123,9 +123,22 @@ int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 		return -1;
 	if (l2->l2_hdr) {
 		ret = send(l2->fd, buf, len, 0);
-		if (ret < 0)
+		if (ret < 0) {
+			if (dst_addr) {
+				wpa_printf(MSG_WARNING,
+					   "l2_packet_send(%s ifindex=%d proto=0x%04x l2_hdr=%d dst=" MACSTR ") failed: %s (%d)",
+					   l2->ifname, l2->ifindex, proto,
+					   l2->l2_hdr, MAC2STR(dst_addr),
+					   strerror(errno), errno);
+			} else {
+				wpa_printf(MSG_WARNING,
+					   "l2_packet_send(%s ifindex=%d proto=0x%04x l2_hdr=%d dst=<none>) failed: %s (%d)",
+					   l2->ifname, l2->ifindex, proto,
+					   l2->l2_hdr, strerror(errno), errno);
+			}
 			wpa_printf(MSG_ERROR, "l2_packet_send - send: %s",
 				   strerror(errno));
+		}
 	} else {
 		struct sockaddr_ll ll;
 		os_memset(&ll, 0, sizeof(ll));
@@ -137,6 +150,18 @@ int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 		ret = sendto(l2->fd, buf, len, 0, (struct sockaddr *) &ll,
 			     sizeof(ll));
 		if (ret < 0) {
+			if (dst_addr) {
+				wpa_printf(MSG_WARNING,
+					   "l2_packet_send(%s ifindex=%d proto=0x%04x l2_hdr=%d dst=" MACSTR ") failed: %s (%d)",
+					   l2->ifname, l2->ifindex, proto,
+					   l2->l2_hdr, MAC2STR(dst_addr),
+					   strerror(errno), errno);
+			} else {
+				wpa_printf(MSG_WARNING,
+					   "l2_packet_send(%s ifindex=%d proto=0x%04x l2_hdr=%d dst=<none>) failed: %s (%d)",
+					   l2->ifname, l2->ifindex, proto,
+					   l2->l2_hdr, strerror(errno), errno);
+			}
 			wpa_printf(MSG_ERROR, "l2_packet_send - sendto: %s",
 				   strerror(errno));
 		}
