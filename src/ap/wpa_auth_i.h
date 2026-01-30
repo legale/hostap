@@ -10,6 +10,7 @@
 #define WPA_AUTH_I_H
 
 #include "utils/list.h"
+#include "utils/os.h"
 
 /* max(dot11RSNAConfigGroupUpdateCount,dot11RSNAConfigPairwiseUpdateCount) */
 #define RSNA_MAX_EAPOL_RETRIES 4
@@ -55,6 +56,9 @@ struct wpa_state_machine {
 	bool MICVerified;
 	bool GUpdateStationKeys;
 	u8 ANonce[WPA_NONCE_LEN];
+#ifdef CONFIG_IEEE80211R_AP
+	struct os_reltime ANonce_time;
+#endif /* CONFIG_IEEE80211R_AP */
 	u8 SNonce[WPA_NONCE_LEN];
 	u8 alt_SNonce[WPA_NONCE_LEN];
 	u8 alt_replay_counter[WPA_REPLAY_COUNTER_LEN];

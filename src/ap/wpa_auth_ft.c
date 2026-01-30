@@ -3146,6 +3146,8 @@ static int wpa_ft_process_auth_req(struct wpa_state_machine *sm,
 	size_t identity_len = 0, radius_cui_len = 0;
 	size_t pmk_r1_len, kdk_len, len;
 	int retval = WLAN_STATUS_UNSPECIFIED_FAILURE;
+	struct os_reltime now;
+	struct rsn_ftie *ftie;
 
 	*resp_ies = NULL;
 	*resp_ies_len = 0;
@@ -3176,6 +3178,9 @@ static int wpa_ft_process_auth_req(struct wpa_state_machine *sm,
 		retval = WLAN_STATUS_INVALID_FTIE;
 		goto out;
 	}
+
+	ftie = (struct rsn_ftie *) parse.ftie;
+	os_memcpy(sm->SNonce, ftie->snonce, WPA_NONCE_LEN);
 
 	if (parse.r0kh_id == NULL) {
 		wpa_printf(MSG_DEBUG, "FT: Invalid FTIE - no R0KH-ID");
@@ -3277,10 +3282,18 @@ pmk_r1_derived:
 	os_memcpy(sm->pmk_r1, pmk_r1, pmk_r1_len);
 	sm->pmk_r1_len = pmk_r1_len;
 
-	if (random_get_bytes(sm->ANonce, WPA_NONCE_LEN)) {
-		wpa_printf(MSG_DEBUG, "FT: Failed to get random data for "
-			   "ANonce");
-		goto out;
+	if (os_get_reltime(&now) < 0 ||
+	    os_reltime_expired(&now, &sm->ANonce_time, 3)) {
+		if (random_get_bytes(sm->ANonce, WPA_NONCE_LEN)) {
+			wpa_printf(MSG_DEBUG, "FT: Failed to get random data for "
+				   "ANonce");
+			return WLAN_STATUS_UNSPECIFIED_FAILURE;
+		}
+		sm->ANonce_time.sec = now.sec;
+		sm->ANonce_time.usec = now.usec;
+		wpa_printf(MSG_INFO, "FT: ANonce was randomized");
+	} else {
+		wpa_printf(MSG_INFO, "FT: ANonce has not expired");
 	}
 
 	/* Now that we know the correct PMK-R1 length and as such, the length
