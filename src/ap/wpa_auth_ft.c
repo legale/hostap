@@ -1992,8 +1992,11 @@ static int wpa_ft_pull_pmk_r1(struct wpa_state_machine *sm,
 		{ .type = FT_RRB_LAST_EMPTY, .len = 0, .data = NULL },
 	};
 
-	if (sm->ft_pending_pull_left_retries <= 0)
+	if (sm->ft_pending_pull_left_retries <= 0) {
+		wpa_printf(MSG_WARNING,
+			   "FT: PMK-R1 pull retries exhausted");
 		return -1;
+	}
 	first = sm->ft_pending_pull_left_retries ==
 		sm->wpa_auth->conf.rkh_pull_retries;
 	sm->ft_pending_pull_left_retries--;
@@ -2017,16 +2020,22 @@ static int wpa_ft_pull_pmk_r1(struct wpa_state_machine *sm,
 	if (r0kh == NULL) {
 		wpa_hexdump(MSG_DEBUG, "FT: Did not find R0KH-ID",
 			    sm->r0kh_id, sm->r0kh_id_len);
+		wpa_printf(MSG_WARNING,
+			   "FT: No matching R0KH-ID for PMK-R1 pull");
 		return -1;
 	}
 	if (is_zero_ether_addr(r0kh->addr)) {
 		wpa_hexdump(MSG_DEBUG, "FT: R0KH-ID is temporarily blocked",
 			    sm->r0kh_id, sm->r0kh_id_len);
+		wpa_printf(MSG_WARNING,
+			   "FT: R0KH-ID temporarily blocked for PMK-R1 pull");
 		return -1;
 	}
 	if (ether_addr_equal(r0kh->addr, sm->wpa_auth->addr)) {
 		wpa_printf(MSG_DEBUG,
 			   "FT: R0KH-ID points to self - no matching key available");
+		wpa_printf(MSG_WARNING,
+			   "FT: R0KH-ID points to self - cannot pull PMK-R1");
 		return -1;
 	}
 
@@ -2047,26 +2056,32 @@ static int wpa_ft_pull_pmk_r1(struct wpa_state_machine *sm,
 
 	if (first &&
 	    random_get_bytes(sm->ft_pending_pull_nonce, FT_RRB_NONCE_LEN) < 0) {
-		wpa_printf(MSG_DEBUG, "FT: Failed to get random data for "
-			   "nonce");
+		wpa_printf(MSG_WARNING,
+			   "FT: Failed to get random data for nonce");
 		return -1;
 	}
 
 	if (wpa_ft_new_seq(r0kh->seq, &f_seq) < 0) {
-		wpa_printf(MSG_DEBUG, "FT: Failed to get seq num");
+		wpa_printf(MSG_WARNING,
+			   "FT: Failed to get seq num for PMK-R1 pull");
 		return -1;
 	}
 
 	if (wpa_ft_rrb_build(key, key_len, req_enc, NULL, req_auth, NULL,
 			     sm->wpa_auth->addr, FT_PACKET_R0KH_R1KH_PULL,
-			     &packet, &packet_len) < 0)
+			     &packet, &packet_len) < 0) {
+		wpa_printf(MSG_WARNING,
+			   "FT: Failed to build PMK-R1 pull request");
 		return -1;
+	}
 
 	ft_pending_req_ies = wpabuf_alloc_copy(ies, ies_len);
 	wpabuf_free(sm->ft_pending_req_ies);
 	sm->ft_pending_req_ies = ft_pending_req_ies;
 	if (!sm->ft_pending_req_ies) {
 		os_free(packet);
+		wpa_printf(MSG_WARNING,
+			   "FT: Failed to store pending pull request IEs");
 		return -1;
 	}
 
@@ -4399,7 +4414,8 @@ static int wpa_ft_rrb_rx_resp(struct wpa_authenticator *wpa_auth,
 	ctx.nonce = f_nonce;
 	if (!wpa_auth_for_each_sta(wpa_auth, ft_get_sta_cb, &ctx)) {
 		/* nonce not found */
-		wpa_printf(MSG_DEBUG, "FT: Invalid nonce");
+		wpa_printf(MSG_WARNING,
+			   "FT: Invalid nonce in PMK-R1 pull response");
 		return -1;
 	}
 
@@ -4409,11 +4425,16 @@ static int wpa_ft_rrb_rx_resp(struct wpa_authenticator *wpa_auth,
 	if (ret == -2) {
 		ret = 0;
 		nak = 1;
+		wpa_printf(MSG_WARNING,
+			   "FT: PMK-R1 pull response NAK (missing pairwise)");
 	} else {
 		nak = 0;
 	}
-	if (ret < 0)
+	if (ret < 0) {
+		wpa_printf(MSG_WARNING,
+			   "FT: Failed to process PMK-R1 pull response");
 		return -1;
+	}
 
 	ctx.s1kh_id = s1kh_id;
 	if (wpa_auth_for_each_sta(wpa_auth, ft_get_sta_cb, &ctx)) {
