@@ -11,6 +11,9 @@
 #ifndef AP_LIST_H
 #define AP_LIST_H
 
+struct hostapd_iface;
+struct ieee80211_mgmt;
+
 struct ap_info {
 	/* Note: next/prev pointers are updated whenever a new beacon is
 	 * received because these are used to find the least recently used

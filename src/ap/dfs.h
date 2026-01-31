@@ -9,6 +9,8 @@
 #ifndef DFS_H
 #define DFS_H
 
+struct hostapd_iface;
+
 int hostapd_handle_dfs(struct hostapd_iface *iface);
 
 int hostapd_dfs_complete_cac(struct hostapd_iface *iface, int success, int freq,

@@ -1007,7 +1007,7 @@ int radius_msg_verify_msg_auth(struct radius_msg *msg, const u8 *secret,
 	if (hmac_md5(secret, secret_len, wpabuf_head(msg->buf),
 		     wpabuf_len(msg->buf), auth) < 0) {
 		wpa_printf(MSG_INFO, "RADIUS: MD5 not available");
-		WPA_MSG_WIFI_ERR(S_RADIUS_RESP,
+		WIFIMON_ERR(S_UNK,
 				 "Message-Authenticator verification failed: HMAC-MD5 calculation error. No Message-Authenticator attribute found");
 		return 1;
 	}

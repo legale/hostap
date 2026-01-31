@@ -9,12 +9,16 @@
 #ifndef AP_DRV_OPS
 #define AP_DRV_OPS
 
+#include "hostapd.h"
+
 enum wpa_driver_if_type;
 struct wpa_bss_params;
 struct wpa_driver_scan_params;
 struct ieee80211_ht_capabilities;
 struct ieee80211_vht_capabilities;
 struct hostapd_freq_params;
+struct hostapd_data;
+struct sta_info;
 
 u32 hostapd_sta_flags_to_drv(u32 flags);
 int hostapd_build_ap_extra_ies(struct hostapd_data *hapd,

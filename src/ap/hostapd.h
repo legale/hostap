@@ -763,6 +763,7 @@ struct hostapd_data *
 hostapd_alloc_bss_data(struct hostapd_iface *hapd_iface,
 		       struct hostapd_config *conf,
 		       struct hostapd_bss_config *bss);
+int hostapd_setup_bss(struct hostapd_data *hapd, int first, bool start_beacon);
 int hostapd_setup_interface(struct hostapd_iface *iface);
 int hostapd_setup_interface_complete(struct hostapd_iface *iface, int err);
 void hostapd_interface_deinit(struct hostapd_iface *iface);
@@ -782,6 +783,7 @@ int hostapd_enable_iface(struct hostapd_iface *hapd_iface);
 int hostapd_reload_iface(struct hostapd_iface *hapd_iface);
 int hostapd_reload_bss_only(struct hostapd_data *bss);
 int hostapd_disable_iface(struct hostapd_iface *hapd_iface);
+void hostapd_bss_deinit(struct hostapd_data *hapd);
 void hostapd_bss_deinit_no_free(struct hostapd_data *hapd);
 void hostapd_free_hapd_data(struct hostapd_data *hapd);
 void hostapd_cleanup_iface_partial(struct hostapd_iface *iface);
@@ -803,6 +805,7 @@ hostapd_switch_channel_fallback(struct hostapd_iface *iface,
 void hostapd_cleanup_cs_params(struct hostapd_data *hapd);
 void hostapd_periodic_iface(struct hostapd_iface *iface);
 int hostapd_owe_trans_get_info(struct hostapd_data *hapd);
+void hostapd_owe_update_trans(struct hostapd_iface *iface);
 void hostapd_ocv_check_csa_sa_query(void *eloop_ctx, void *timeout_ctx);
 
 void hostapd_switch_color(struct hostapd_data *hapd, u64 bitmap);

@@ -634,6 +634,7 @@ struct hostapd_bss_config {
 
 #ifdef CONFIG_HS20
 	int hs20;
+	int osen;
 	int hs20_release;
 	int disable_dgaf;
 	u16 anqp_domain_id;
@@ -995,6 +996,11 @@ struct hostapd_bss_config {
 	unsigned int pmksa_caching_privacy:1;
 	unsigned int eap_using_authentication_frames:1;
 #endif /* CONFIG_ENC_ASSOC  */
+
+#ifdef CONFIG_APUP
+	bool apup;
+	char apup_peer_ifname_prefix[IFNAMSIZ + 1];
+#endif /* CONFIG_APUP */
 };
 
 /**
