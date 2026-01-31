@@ -23,6 +23,7 @@ struct l2_packet_data {
 	int fd; /* packet socket for EAPOL frames */
 	char ifname[IFNAMSIZ + 1];
 	int ifindex;
+	unsigned short protocol;
 	u8 own_addr[ETH_ALEN];
 	void (*rx_callback)(void *ctx, const u8 *src_addr,
 			    const u8 *buf, size_t len);
@@ -104,6 +105,52 @@ static const struct sock_fprog pkt_type_sock_filter = {
 	.filter = pkt_type_filter_insns,
 };
 
+static int l2_packet_refresh_ifindex(struct l2_packet_data *l2)
+{
+	struct ifreq ifr;
+	struct sockaddr_ll ll;
+	int old_ifindex;
+	int new_ifindex;
+
+	old_ifindex = l2->ifindex;
+	os_memset(&ifr, 0, sizeof(ifr));
+	os_strlcpy(ifr.ifr_name, l2->ifname, sizeof(ifr.ifr_name));
+	if (ioctl(l2->fd, SIOCGIFINDEX, &ifr) < 0) {
+		wpa_printf(MSG_WARNING,
+			   "l2_packet: failed to get ifindex for %s: %s (%d)",
+			   l2->ifname, strerror(errno), errno);
+		return -1;
+	}
+
+	new_ifindex = ifr.ifr_ifindex;
+	if (new_ifindex == old_ifindex)
+		return 0;
+
+	l2->ifindex = new_ifindex;
+	if (l2->rx_callback) {
+		os_memset(&ll, 0, sizeof(ll));
+		ll.sll_family = PF_PACKET;
+		ll.sll_ifindex = new_ifindex;
+		ll.sll_protocol = htons(l2->protocol);
+		if (bind(l2->fd, (struct sockaddr *) &ll, sizeof(ll)) < 0) {
+			wpa_printf(MSG_WARNING,
+				   "l2_packet: rebind(%s ifindex=%d) failed: %s (%d)",
+				   l2->ifname, new_ifindex,
+				   strerror(errno), errno);
+			return -1;
+		}
+	}
+
+	if (ioctl(l2->fd, SIOCGIFHWADDR, &ifr) == 0)
+		os_memcpy(l2->own_addr, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
+
+	wpa_printf(MSG_WARNING,
+		   "l2_packet: %s ifindex changed %d -> %d, rebound",
+		   l2->ifname, old_ifindex, new_ifindex);
+
+	return 1;
+}
+
 
 int l2_packet_get_own_addr(struct l2_packet_data *l2, u8 *addr)
 {
@@ -116,28 +163,39 @@ int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 		   const u8 *buf, size_t len)
 {
 	int ret;
+	int err;
+	int retry = 1;
 
 	if (TEST_FAIL())
 		return -1;
 	if (l2 == NULL)
 		return -1;
+retry_send:
 	if (l2->l2_hdr) {
 		ret = send(l2->fd, buf, len, 0);
 		if (ret < 0) {
+			err = errno;
 			if (dst_addr) {
 				wpa_printf(MSG_WARNING,
 					   "l2_packet_send(%s ifindex=%d proto=0x%04x l2_hdr=%d dst=" MACSTR ") failed: %s (%d)",
 					   l2->ifname, l2->ifindex, proto,
 					   l2->l2_hdr, MAC2STR(dst_addr),
-					   strerror(errno), errno);
+					   strerror(err), err);
 			} else {
 				wpa_printf(MSG_WARNING,
 					   "l2_packet_send(%s ifindex=%d proto=0x%04x l2_hdr=%d dst=<none>) failed: %s (%d)",
 					   l2->ifname, l2->ifindex, proto,
-					   l2->l2_hdr, strerror(errno), errno);
+					   l2->l2_hdr, strerror(err), err);
 			}
 			wpa_printf(MSG_ERROR, "l2_packet_send - send: %s",
-				   strerror(errno));
+				   strerror(err));
+			if (retry && (err == ENXIO || err == ENODEV ||
+				      err == ENETDOWN ||
+				      err == EADDRNOTAVAIL)) {
+				retry = 0;
+				if (l2_packet_refresh_ifindex(l2) > 0)
+					goto retry_send;
+			}
 		}
 	} else {
 		struct sockaddr_ll ll;
@@ -150,20 +208,28 @@ int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 		ret = sendto(l2->fd, buf, len, 0, (struct sockaddr *) &ll,
 			     sizeof(ll));
 		if (ret < 0) {
+			err = errno;
 			if (dst_addr) {
 				wpa_printf(MSG_WARNING,
 					   "l2_packet_send(%s ifindex=%d proto=0x%04x l2_hdr=%d dst=" MACSTR ") failed: %s (%d)",
 					   l2->ifname, l2->ifindex, proto,
 					   l2->l2_hdr, MAC2STR(dst_addr),
-					   strerror(errno), errno);
+					   strerror(err), err);
 			} else {
 				wpa_printf(MSG_WARNING,
 					   "l2_packet_send(%s ifindex=%d proto=0x%04x l2_hdr=%d dst=<none>) failed: %s (%d)",
 					   l2->ifname, l2->ifindex, proto,
-					   l2->l2_hdr, strerror(errno), errno);
+					   l2->l2_hdr, strerror(err), err);
 			}
 			wpa_printf(MSG_ERROR, "l2_packet_send - sendto: %s",
-				   strerror(errno));
+				   strerror(err));
+			if (retry && (err == ENXIO || err == ENODEV ||
+				      err == ENETDOWN ||
+				      err == EADDRNOTAVAIL)) {
+				retry = 0;
+				if (l2_packet_refresh_ifindex(l2) > 0)
+					goto retry_send;
+			}
 		}
 	}
 	return ret;
@@ -310,6 +376,7 @@ struct l2_packet_data * l2_packet_init(
 	l2->rx_callback = rx_callback;
 	l2->rx_callback_ctx = rx_callback_ctx;
 	l2->l2_hdr = l2_hdr;
+	l2->protocol = protocol;
 #ifndef CONFIG_NO_LINUX_PACKET_SOCKET_WAR
 	l2->fd_br_rx = -1;
 #endif /* CONFIG_NO_LINUX_PACKET_SOCKET_WAR */
