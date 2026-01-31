@@ -1379,29 +1379,33 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 
 	int ret = radius_msg_get_attr_ptr(req->msg, RADIUS_ATTR_CALLING_STATION_ID,
 								&attr_val_ptr, &len_attr, NULL);
-	WPA_MSG_WIFI_INF(S_RADIUS_RESP, "radius_msg_get_attr_ptr 31 len: %zu", len_attr);
+	WIFIMON_INF(stage, "radius_msg_get_attr_ptr 31 len: %zu", len_attr);
 
 	if (ret == 0) {
-		// parse string as 80211x mac address format string and store mac to
-		// byte array
-		if (a2mac_80211x(attr_val_ptr, buf_mac)) {
-			WPA_MSG_WIFI_ERR(S_RADIUS_RESP,
-					 "unable to parse attr as 80211x mac string");
+		/* Parse string as 802.1X MAC address format and store mac bytes */
+		size_t copy_len = len_attr;
 
-			if (len_attr > sizeof(buf_macstr)) {
-				WPA_MSG_WIFI_ERR(S_RADIUS_RESP,
-						 "attr len: %zu > %zu",
-						 sizeof(buf_macstr));
+		if (copy_len >= sizeof(buf_macstr))
+			copy_len = sizeof(buf_macstr) - 1;
+		memcpy(buf_macstr, attr_val_ptr, copy_len);
+		buf_macstr[copy_len] = '\0';
+
+		if (hwaddr_aton2((const char *) buf_macstr, buf_mac) < 0) {
+			WIFIMON_ERR(stage,
+				    "unable to parse attr as 80211x mac string");
+
+			if (len_attr >= sizeof(buf_macstr)) {
+				WIFIMON_ERR(stage,
+					    "attr len: %zu > %zu",
+					    len_attr, sizeof(buf_macstr) - 1);
 			}
-			memcpy(buf_macstr, attr_val_ptr, len_attr);
-			buf_macstr[len_attr] = '\0';
 		} else {
 			snprintf(buf_macstr, sizeof(buf_macstr), MACSTR,
 				 MAC2STR(buf_mac));
 		}
 		// radius_msg_dump(req->msg);
 	}
-	WPA_MSG_WIFI_INF(S_RADIUS_RESP,
+	WIFIMON_INF(stage,
 			 "radius_type=%d reply code=%u req->addr=" MACSTR
 			 " len=%zu val=%s mac=" MACSTR,
 			 msg_type, hdr->code, MAC2STR(req->addr), len_attr,

@@ -8970,7 +8970,7 @@ int nl80211_has_ifidx(struct wpa_driver_nl80211_data *drv, int ifidx,
 
 
 static int i802_set_wds_sta(void *priv, const u8 *addr, int aid, int val,
-			    const char *bridge_ifname, char *ifname_wds)
+			    const char *bridge_ifname, const char *ifname_wds)
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
@@ -8979,15 +8979,17 @@ static int i802_set_wds_sta(void *priv, const u8 *addr, int aid, int val,
 	bool add_br = false;
 	int ret;
 
-	ret = os_snprintf(name, sizeof(name), "%s.sta%d", bss->ifname, aid);
-	if (ret >= (int) sizeof(name))
-		wpa_printf(MSG_WARNING,
-			   "nl80211: WDS interface name was truncated");
-	else if (ret < 0)
-		return ret;
-
-	if (ifname_wds)
-		os_strlcpy(ifname_wds, name, IFNAMSIZ + 1);
+	if (ifname_wds && ifname_wds[0]) {
+		os_strlcpy(name, ifname_wds, sizeof(name));
+	} else {
+		ret = os_snprintf(name, sizeof(name), "%s.sta%d", bss->ifname,
+				  aid);
+		if (ret >= (int) sizeof(name))
+			wpa_printf(MSG_WARNING,
+				   "nl80211: WDS interface name was truncated");
+		else if (ret < 0)
+			return ret;
+	}
 
 	wpa_printf(MSG_DEBUG, "nl80211: Set WDS STA addr=" MACSTR
 		   " aid=%d val=%d name=%s", MAC2STR(addr), aid, val, name);

@@ -9,7 +9,9 @@
 #ifndef AIRTIME_POLICY_H
 #define AIRTIME_POLICY_H
 
+struct hostapd_data;
 struct hostapd_iface;
+struct sta_info;
 
 #ifdef CONFIG_AIRTIME_POLICY
 

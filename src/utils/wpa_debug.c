@@ -1201,11 +1201,6 @@ void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bss
         strcat(key_mgmt_name, "CCKM");
     }
     
-    if (rsn_data.key_mgmt & WPA_KEY_MGMT_OSEN) {
-        if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
-        strcat(key_mgmt_name, "OSEN");
-    }
-    
     if (rsn_data.key_mgmt & WPA_KEY_MGMT_FT_FILS_SHA256) {
         if (key_mgmt_name[0] != '\0') strcat(key_mgmt_name, "_");
         strcat(key_mgmt_name, "FT_FILS_SHA256");
