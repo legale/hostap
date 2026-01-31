@@ -9,6 +9,9 @@
 #ifndef ACCOUNTING_H
 #define ACCOUNTING_H
 
+struct hostapd_data;
+struct sta_info;
+
 #ifdef CONFIG_NO_ACCOUNTING
 static inline int accounting_sta_get_id(struct hostapd_data *hapd,
 					struct sta_info *sta)

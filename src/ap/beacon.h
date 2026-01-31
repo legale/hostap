@@ -10,7 +10,13 @@
 #ifndef BEACON_H
 #define BEACON_H
 
+struct hostapd_data;
+struct hostapd_iface;
+struct hostapd_sta_info;
 struct ieee80211_mgmt;
+struct wpa_driver_ap_params;
+struct wpabuf;
+struct unsol_bcast_probe_resp;
 
 void handle_probe_req(struct hostapd_data *hapd,
 		      const struct ieee80211_mgmt *mgmt, size_t len,

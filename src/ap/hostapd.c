@@ -1422,8 +1422,8 @@ static int hostapd_bss_radius_init(struct hostapd_data *hapd)
  * initialized. Most of the modules that are initialized here will be
  * deinitialized in hostapd_cleanup().
  */
-static int hostapd_setup_bss(struct hostapd_data *hapd, int first,
-			     bool start_beacon)
+int hostapd_setup_bss(struct hostapd_data *hapd, int first,
+		      bool start_beacon)
 {
 	struct hostapd_bss_config *conf = hapd->conf;
 	u8 ssid[SSID_MAX_LEN + 1];
@@ -2547,7 +2547,7 @@ static int hostapd_owe_iface_iter2(struct hostapd_iface *iface, void *ctx)
 #endif /* CONFIG_OWE */
 
 
-static void hostapd_owe_update_trans(struct hostapd_iface *iface)
+void hostapd_owe_update_trans(struct hostapd_iface *iface)
 {
 #ifdef CONFIG_OWE
 	/* Check whether the enabled BSS can complete OWE transition mode
@@ -3004,7 +3004,7 @@ hostapd_alloc_bss_data(struct hostapd_iface *hapd_iface,
 }
 
 
-static void hostapd_bss_deinit(struct hostapd_data *hapd)
+void hostapd_bss_deinit(struct hostapd_data *hapd)
 {
 	if (!hapd)
 		return;
