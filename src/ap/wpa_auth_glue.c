@@ -117,6 +117,10 @@ static void hostapd_wpa_auth_conf(struct hostapd_iface *iface,
 				  struct wpa_auth_config *wconf)
 {
 	int sae_pw_id;
+	struct ft_remote_r0kh *r0kh;
+	struct ft_remote_r1kh *r1kh;
+	size_t r0kh_count = 0;
+	size_t r1kh_count = 0;
 
 	os_memset(wconf, 0, sizeof(*wconf));
 	wconf->wpa = conf->wpa;
@@ -357,6 +361,76 @@ static void hostapd_wpa_auth_conf(struct hostapd_iface *iface,
 			  wpabuf_head(conf->sae_pw_id_key),
 			  wpabuf_len(conf->sae_pw_id_key));
 	}
+
+#ifdef CONFIG_IEEE80211R_AP
+	if (wpa_key_mgmt_ft(conf->wpa_key_mgmt)) {
+		wpa_printf(MSG_WARNING,
+			   "FT: config iface=%s pmk_r1_push=%d pull_timeout=%dms pull_retries=%d r0_key_lifetime=%u r1_max_key_lifetime=%d ft_over_ds=%d ft_psk_generate_local=%d",
+			   conf->iface ? conf->iface : "<unset>",
+			   conf->pmk_r1_push,
+			   conf->rkh_pull_timeout,
+			   conf->rkh_pull_retries,
+			   conf->r0_key_lifetime,
+			   conf->r1_max_key_lifetime,
+			   conf->ft_over_ds,
+			   conf->ft_psk_generate_local);
+		wpa_hexdump(MSG_WARNING, "FT: mobility_domain",
+			    conf->mobility_domain, MOBILITY_DOMAIN_ID_LEN);
+		if (conf->nas_identifier) {
+			wpa_printf(MSG_WARNING,
+				   "FT: nas_identifier len=%zu value=%s",
+				   os_strlen(conf->nas_identifier),
+				   conf->nas_identifier);
+		} else {
+			wpa_printf(MSG_WARNING,
+				   "FT: nas_identifier not set");
+		}
+		if (wconf->r0_key_holder_len) {
+			wpa_hexdump(MSG_WARNING, "FT: r0_key_holder (R0KH-ID)",
+				    wconf->r0_key_holder,
+				    wconf->r0_key_holder_len);
+		} else {
+			wpa_printf(MSG_WARNING,
+				   "FT: r0_key_holder not set (len=0)");
+		}
+		wpa_hexdump(MSG_WARNING, "FT: r1_key_holder (R1KH-ID)",
+			    wconf->r1_key_holder, FT_R1KH_ID_LEN);
+
+		for (r0kh = conf->r0kh_list; r0kh; r0kh = r0kh->next) {
+			char key_prefix[9];
+			wpa_snprintf_hex(key_prefix, sizeof(key_prefix),
+					 r0kh->key, 4);
+			wpa_printf(MSG_WARNING,
+				   "FT: r0kh_list addr=" MACSTR
+				   " id_len=%zu wildcard=%d key_prefix=%s",
+				   MAC2STR(r0kh->addr), r0kh->id_len,
+				   r0kh->id_len == 1 && r0kh->id[0] == '*',
+				   key_prefix);
+			if (r0kh->id_len)
+				wpa_hexdump(MSG_WARNING, "FT: r0kh_list id",
+					    r0kh->id, r0kh->id_len);
+			r0kh_count++;
+		}
+		for (r1kh = conf->r1kh_list; r1kh; r1kh = r1kh->next) {
+			char key_prefix[9];
+			wpa_snprintf_hex(key_prefix, sizeof(key_prefix),
+					 r1kh->key, 4);
+			wpa_printf(MSG_WARNING,
+				   "FT: r1kh_list addr=" MACSTR
+				   " wildcard=%d key_prefix=%s",
+				   MAC2STR(r1kh->addr),
+				   is_zero_ether_addr(r1kh->addr) &&
+				   is_zero_ether_addr(r1kh->id),
+				   key_prefix);
+			wpa_hexdump(MSG_WARNING, "FT: r1kh_list id",
+				    r1kh->id, FT_R1KH_ID_LEN);
+			r1kh_count++;
+		}
+		wpa_printf(MSG_WARNING,
+			   "FT: r0kh_list count=%zu r1kh_list count=%zu",
+			   r0kh_count, r1kh_count);
+	}
+#endif /* CONFIG_IEEE80211R_AP */
 }
 
 
