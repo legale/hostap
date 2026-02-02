@@ -2911,9 +2911,6 @@ void wpa_ft_install_ptk(struct wpa_state_machine *sm, int retry)
 		return;
 	}
 
-	if (!retry)
-		wpa_auth_add_sta_ft(sm->wpa_auth, sm->addr);
-
 	/* FIX: add STA entry to kernel/driver here? The set_key will fail
 	 * most likely without this.. At the moment, STA entry is added only
 	 * after association has been completed. This function will be called
@@ -3378,6 +3375,7 @@ pmk_r1_derived:
 	sm->pairwise = pairwise;
 	sm->PTK_valid = true;
 	sm->tk_already_set = false;
+	wpa_auth_add_sta_ft(sm->wpa_auth, sm->addr);
 	wpa_ft_install_ptk(sm, 0);
 
 	if (wpa_ft_set_vlan(sm->wpa_auth, sm->addr, &vlan) < 0) {
