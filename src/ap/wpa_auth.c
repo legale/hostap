@@ -1567,7 +1567,7 @@ static bool wpa_auth_valid_counter(struct wpa_authenticator *wpa_auth,
 	if (wpa_replay_counter_valid(sm->key_replay, key->replay_counter))
 		return true;
 
-	if (msg == PAIRWISE_2 &&
+	if (msg == PAIRWISE_2 && !sm->m3_retried &&
 	    wpa_replay_counter_valid(sm->prev_key_replay,
 				     key->replay_counter) &&
 	    sm->wpa_ptk_state == WPA_PTK_PTKINITNEGOTIATING &&
@@ -5531,6 +5531,7 @@ SM_STEP(WPA_PTK)
 		}
 		break;
 	case WPA_PTK_INITPSK:
+		sm->m3_retried = 0;
 		if (wpa_auth_get_psk(wpa_auth, sm->addr, sm->p2p_dev_addr,
 				     NULL, NULL, NULL)) {
 			SM_ENTER(WPA_PTK, PTKSTART);
@@ -5543,6 +5544,9 @@ SM_STEP(WPA_PTK)
 			wpa_printf(MSG_DEBUG,
 				   "INITPSK: No PSK yet available for STA - use RADIUS later");
 			SM_ENTER(WPA_PTK, PTKSTART);
+		} else if (sm->TimeoutEvt) {
+			sm->m3_retried = 1;
+			SM_ENTER(WPA_PTK, PTKINITNEGOTIATING);
 		} else {
 			wpa_auth_logger(wpa_auth, wpa_auth_get_spa(sm),
 					LOGGER_INFO,

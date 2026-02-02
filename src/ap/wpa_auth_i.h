@@ -102,6 +102,7 @@ struct wpa_state_machine {
 #endif /* CONFIG_IEEE80211R_AP */
 	unsigned int is_wnmsleep:1;
 	unsigned int pmkid_set:1;
+	unsigned int m3_retried:1;
 	unsigned int spp_amsdu:1;
 
 	unsigned int ptkstart_without_success;
