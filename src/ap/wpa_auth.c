@@ -6900,8 +6900,12 @@ void wpa_auth_pmksa_remove(struct wpa_authenticator *wpa_auth,
 
 	pmksa = pmksa_cache_auth_get(wpa_auth->pmksa, sta_addr, NULL);
 	if (pmksa) {
-		wpa_printf(MSG_DEBUG, "WPA: Remove PMKSA cache entry for "
-			   MACSTR " based on request", MAC2STR(sta_addr));
+		wpa_printf(MSG_WARNING,
+			   "FT: PMKSA cache entry removed for " MACSTR
+			   " (request)",
+			   MAC2STR(sta_addr));
+		wpa_hexdump(MSG_WARNING, "FT: PMKID (remove)",
+			    pmksa->pmkid, PMKID_LEN);
 		pmksa_cache_free_entry(wpa_auth->pmksa, pmksa);
 	}
 
@@ -6910,10 +6914,12 @@ void wpa_auth_pmksa_remove(struct wpa_authenticator *wpa_auth,
 		pmksa = pmksa_cache_auth_get(wpa_auth->ml_pmksa,
 					     sta_addr, NULL);
 		if (pmksa) {
-			wpa_printf(MSG_DEBUG,
-				   "WPA: Remove PMKSA cache entry for " MACSTR
-				   " based on request (MLD)",
+			wpa_printf(MSG_WARNING,
+				   "FT: PMKSA cache entry removed for " MACSTR
+				   " (request, MLD)",
 				   MAC2STR(sta_addr));
+			wpa_hexdump(MSG_WARNING, "FT: PMKID (remove, MLD)",
+				    pmksa->pmkid, PMKID_LEN);
 			pmksa_cache_free_entry(wpa_auth->ml_pmksa, pmksa);
 		}
 	}
