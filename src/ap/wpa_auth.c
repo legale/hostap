@@ -1273,14 +1273,14 @@ static int ft_check_msg_2_of_4(struct wpa_authenticator *wpa_auth,
 
 	if (wpa_parse_wpa_ie_rsn(kde->rsn_ie, kde->rsn_ie_len, &ie) < 0 ||
 	    ie.num_pmkid < 1 || !ie.pmkid) {
-		wpa_printf(MSG_DEBUG,
-			   "FT: No PMKR1Name in FT 4-way handshake message 2/4");
+		wpa_auth_logger(wpa_auth, wpa_auth_get_spa(sm), LOGGER_WARNING,
+				"FT: No PMKR1Name in FT 4-way handshake message 2/4");
 		return -1;
 	}
 
 	if (wpa_parse_wpa_ie_rsn(sm->wpa_ie, sm->wpa_ie_len, &assoc_ie) < 0) {
-		wpa_printf(MSG_DEBUG,
-			   "FT: Could not parse (Re)Association Request frame RSNE");
+		wpa_auth_logger(wpa_auth, wpa_auth_get_spa(sm), LOGGER_WARNING,
+				"FT: Could not parse (Re)Association Request frame RSNE");
 		os_memset(&assoc_ie, 0, sizeof(assoc_ie));
 		/* Continue to allow PMKR1Name matching to be done to cover the
 		 * case where it is the only listed PMKID. */
@@ -1318,20 +1318,20 @@ static int ft_check_msg_2_of_4(struct wpa_authenticator *wpa_auth,
 
 	if (!found) {
 		wpa_auth_logger(sm->wpa_auth, wpa_auth_get_spa(sm),
-				LOGGER_DEBUG,
-				"PMKR1Name mismatch in FT 4-way handshake");
-		wpa_hexdump(MSG_DEBUG,
+				LOGGER_WARNING,
+				"FT: PMKR1Name mismatch in FT 4-way handshake");
+		wpa_hexdump(MSG_WARNING,
 			    "FT: PMKIDs/PMKR1Name from Supplicant",
 			    ie.pmkid, ie.num_pmkid * PMKID_LEN);
-		wpa_hexdump(MSG_DEBUG, "FT: Derived PMKR1Name",
+		wpa_hexdump(MSG_WARNING, "FT: Derived PMKR1Name",
 			    sm->pmk_r1_name, WPA_PMK_NAME_LEN);
 		return -1;
 	}
 
 	if (!kde->mdie || !kde->ftie) {
-		wpa_printf(MSG_DEBUG,
-			   "FT: No %s in FT 4-way handshake message 2/4",
-			   kde->mdie ? "FTIE" : "MDIE");
+		wpa_auth_vlogger(wpa_auth, wpa_auth_get_spa(sm), LOGGER_WARNING,
+				 "FT: No %s in FT 4-way handshake message 2/4",
+				 kde->mdie ? "FTIE" : "MDIE");
 		return -1;
 	}
 
@@ -1339,7 +1339,8 @@ static int ft_check_msg_2_of_4(struct wpa_authenticator *wpa_auth,
 	if (kde->mdie[1] < sizeof(struct rsn_mdie) ||
 	    os_memcmp(wpa_auth->conf.mobility_domain, mdie->mobility_domain,
 		      MOBILITY_DOMAIN_ID_LEN) != 0) {
-		wpa_printf(MSG_DEBUG, "FT: MDIE mismatch");
+		wpa_auth_logger(wpa_auth, wpa_auth_get_spa(sm), LOGGER_WARNING,
+				"FT: MDIE mismatch in FT 4-way handshake");
 		return -1;
 	}
 
@@ -1347,10 +1348,11 @@ static int ft_check_msg_2_of_4(struct wpa_authenticator *wpa_auth,
 	    (kde->ftie[1] != sm->assoc_resp_ftie[1] ||
 	     os_memcmp(kde->ftie, sm->assoc_resp_ftie,
 		       2 + sm->assoc_resp_ftie[1]) != 0)) {
-		wpa_printf(MSG_DEBUG, "FT: FTIE mismatch");
-		wpa_hexdump(MSG_DEBUG, "FT: FTIE in EAPOL-Key msg 2/4",
+		wpa_auth_logger(wpa_auth, wpa_auth_get_spa(sm), LOGGER_WARNING,
+				"FT: FTIE mismatch in FT 4-way handshake");
+		wpa_hexdump(MSG_WARNING, "FT: FTIE in EAPOL-Key msg 2/4",
 			    kde->ftie, kde->ftie_len);
-		wpa_hexdump(MSG_DEBUG, "FT: FTIE in (Re)AssocResp",
+		wpa_hexdump(MSG_WARNING, "FT: FTIE in (Re)AssocResp",
 			    sm->assoc_resp_ftie, 2 + sm->assoc_resp_ftie[1]);
 		return -1;
 	}
