@@ -6466,6 +6466,7 @@ static const char * wpa_bool_txt(int val)
 	return val ? "TRUE" : "FALSE";
 }
 
+#ifdef CONFIG_CTRL_IFACE_MIB
 
 #define RSN_SUITE "%02x-%02x-%02x-%d"
 #define RSN_SUITE_ARG(s) \
@@ -6618,7 +6619,7 @@ int wpa_get_mib_sta(struct wpa_state_machine *sm, char *buf, size_t buflen)
 
 	return len;
 }
-
+#endif
 
 void wpa_auth_countermeasures_start(struct wpa_authenticator *wpa_auth)
 {
@@ -7974,7 +7975,6 @@ struct wpa_group * wpa_select_vlan_wpa_group(struct wpa_group *gsm, int vlan_id)
 
 	return vlan_gsm;
 }
-
 
 void wpa_auth_set_sae_pw_id(struct wpa_state_machine *sm,
 			    const struct wpabuf *pw_id,
