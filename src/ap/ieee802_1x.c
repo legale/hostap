@@ -1288,6 +1288,11 @@ void ieee802_1x_receive(struct hostapd_data *hapd, const u8 *sa, const u8 *buf,
 			hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_WPA,
 				       HOSTAPD_LEVEL_DEBUG,
 				       "cached PMKSA available - ignore it since STA sent EAPOL-Start");
+			wpa_printf(MSG_WARNING,
+				   "FT: PMKSA cache cleared due to EAPOL-Start from "
+				   MACSTR, MAC2STR(sta->addr));
+			wpa_hexdump(MSG_WARNING, "FT: PMKID (clear)",
+				    pmksa->pmkid, PMKID_LEN);
 			wpa_auth_sta_clear_pmksa(sta->wpa_sm, pmksa);
 		}
 		sta->eapol_sm->eapolStart = true;

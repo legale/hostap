@@ -102,8 +102,10 @@ void pmksa_cache_free_entry(struct rsn_pmksa_cache *pmksa,
 void pmksa_cache_auth_flush(struct rsn_pmksa_cache *pmksa)
 {
 	while (pmksa->pmksa) {
-		wpa_printf(MSG_DEBUG, "RSN: Flush PMKSA cache entry for "
+		wpa_printf(MSG_WARNING, "FT: PMKSA cache flush entry for "
 			   MACSTR, MAC2STR(pmksa->pmksa->spa));
+		wpa_hexdump(MSG_WARNING, "FT: PMKID (flush)",
+			    pmksa->pmksa->pmkid, PMKID_LEN);
 		pmksa_cache_free_entry(pmksa, pmksa->pmksa);
 	}
 }
@@ -116,8 +118,14 @@ static void pmksa_cache_expire(void *eloop_ctx, void *timeout_ctx)
 
 	os_get_reltime(&now);
 	while (pmksa->pmksa && pmksa->pmksa->expiration <= now.sec) {
-		wpa_printf(MSG_DEBUG, "RSN: expired PMKSA cache entry for "
-			   MACSTR, MAC2STR(pmksa->pmksa->spa));
+		wpa_printf(MSG_WARNING,
+			   "FT: PMKSA cache entry expired for " MACSTR
+			   " (now=%lu exp=%lu)",
+			   MAC2STR(pmksa->pmksa->spa),
+			   (unsigned long) now.sec,
+			   (unsigned long) pmksa->pmksa->expiration);
+		wpa_hexdump(MSG_WARNING, "FT: PMKID (expired)",
+			    pmksa->pmksa->pmkid, PMKID_LEN);
 		pmksa_cache_free_entry(pmksa, pmksa->pmksa);
 	}
 
@@ -380,14 +388,24 @@ int pmksa_cache_auth_add_entry(struct rsn_pmksa_cache *pmksa,
 	/* Replace an old entry for the same STA (if found) with the new entry
 	 */
 	pos = pmksa_cache_auth_get(pmksa, entry->spa, NULL);
-	if (pos)
+	if (pos) {
+		wpa_printf(MSG_WARNING,
+			   "FT: PMKSA cache replace entry for " MACSTR,
+			   MAC2STR(entry->spa));
+		wpa_hexdump(MSG_WARNING, "FT: PMKID (old)",
+			    pos->pmkid, PMKID_LEN);
+		wpa_hexdump(MSG_WARNING, "FT: PMKID (new)",
+			    entry->pmkid, PMKID_LEN);
 		pmksa_cache_free_entry(pmksa, pos);
+	}
 
 	if (pmksa->pmksa_count >= pmksa_cache_max_entries && pmksa->pmksa) {
 		/* Remove the oldest entry to make room for the new entry */
-		wpa_printf(MSG_DEBUG, "RSN: removed the oldest PMKSA cache "
-			   "entry (for " MACSTR ") to make room for new one",
-			   MAC2STR(pmksa->pmksa->spa));
+		wpa_printf(MSG_WARNING,
+			   "FT: PMKSA cache full - remove oldest entry for "
+			   MACSTR, MAC2STR(pmksa->pmksa->spa));
+		wpa_hexdump(MSG_WARNING, "FT: PMKID (oldest)",
+			    pmksa->pmksa->pmkid, PMKID_LEN);
 		pmksa_cache_free_entry(pmksa, pmksa->pmksa);
 	}
 
@@ -455,6 +473,8 @@ void pmksa_cache_auth_deinit(struct rsn_pmksa_cache *pmksa)
 	if (pmksa == NULL)
 		return;
 
+	wpa_printf(MSG_WARNING, "FT: PMKSA cache deinit (entries=%d)",
+		   pmksa->pmksa_count);
 	entry = pmksa->pmksa;
 	while (entry) {
 		prev = entry;
@@ -637,6 +657,11 @@ int pmksa_cache_auth_radius_das_disconnect(struct rsn_pmksa_cache *pmksa,
 	entry = pmksa->pmksa;
 	while (entry) {
 		if (das_attr_match(entry, attr)) {
+			wpa_printf(MSG_WARNING,
+				   "FT: PMKSA cache entry removed by RADIUS DAS for "
+				   MACSTR, MAC2STR(entry->spa));
+			wpa_hexdump(MSG_WARNING, "FT: PMKID (DAS)",
+				    entry->pmkid, PMKID_LEN);
 			found++;
 			prev = entry;
 			entry = entry->next;
