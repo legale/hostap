@@ -182,6 +182,8 @@ static void add_ifidx(struct wpa_driver_nl80211_data *drv, int ifidx,
 		      int ifidx_reason);
 static void del_ifidx(struct wpa_driver_nl80211_data *drv, int ifidx,
 		      int ifidx_reason);
+int nl80211_has_ifidx(struct wpa_driver_nl80211_data *drv, int ifidx,
+		      int ifidx_reason);
 
 static int nl80211_set_channel(struct i802_bss *bss,
 			       struct hostapd_freq_params *freq, int set_chan);
@@ -2256,6 +2258,11 @@ static int wpa_driver_nl80211_init_nl_global(struct nl80211_global *global)
 		   global->nl80211_maxattr);
 	genl_family_put(family);
 	nl_cache_free(cache);
+
+	nl_cb_set(global->nl_cb, NL_CB_SEQ_CHECK, NL_CB_CUSTOM,
+		  no_seq_check, NULL);
+	nl_cb_set(global->nl_cb, NL_CB_VALID, NL_CB_CUSTOM,
+		  process_global_event, global);
 
 	nl80211_register_eloop_read(&global->nl_event,
 				    wpa_driver_nl80211_event_receive,
@@ -6502,7 +6509,7 @@ const char * nl80211_iftype_str(enum nl80211_iftype mode)
 static int nl80211_create_iface_once(struct wpa_driver_nl80211_data *drv,
 				     const char *ifname,
 				     enum nl80211_iftype iftype,
-				     const u8 *addr, int wds,
+				     const u8 *addr, int wds, u32 radio_mask,
 				     int (*handler)(struct nl_msg *, void *),
 				     void *arg)
 {
@@ -6520,6 +6527,10 @@ static int nl80211_create_iface_once(struct wpa_driver_nl80211_data *drv,
 		goto fail;
 
 	if (wds && nla_put_u8(msg, NL80211_ATTR_4ADDR, wds))
+		goto fail;
+
+	if (radio_mask &&
+	    nla_put_u32(msg, NL80211_ATTR_VIF_RADIO_MASK, radio_mask))
 		goto fail;
 
 	/*
@@ -6614,14 +6625,14 @@ static int nl80211_create_iface_once(struct wpa_driver_nl80211_data *drv,
 
 int nl80211_create_iface(struct wpa_driver_nl80211_data *drv,
 			 const char *ifname, enum nl80211_iftype iftype,
-			 const u8 *addr, int wds,
+			 const u8 *addr, int wds, u32 radio_mask,
 			 int (*handler)(struct nl_msg *, void *),
 			 void *arg, int use_existing)
 {
 	int ret;
 
-	ret = nl80211_create_iface_once(drv, ifname, iftype, addr, wds, handler,
-					arg);
+	ret = nl80211_create_iface_once(drv, ifname, iftype, addr, wds, radio_mask,
+					handler, arg);
 
 	/* if error occurred and interface exists already */
 	if (ret < 0 && if_nametoindex(ifname)) {
@@ -6647,7 +6658,7 @@ int nl80211_create_iface(struct wpa_driver_nl80211_data *drv,
 
 		/* Try to create the interface again */
 		ret = nl80211_create_iface_once(drv, ifname, iftype, addr,
-						wds, handler, arg);
+						wds, radio_mask, handler, arg);
 	}
 
 	if (ret >= 0 && is_p2p_net_interface(iftype)) {
@@ -8962,22 +8973,10 @@ static int i802_set_wds_sta(void *priv, const u8 *addr, int aid, int val,
 {
 	struct i802_bss *bss = priv;
 	struct wpa_driver_nl80211_data *drv = bss->drv;
-	char name[IFNAMSIZ + 1];
+	const char *name = ifname_wds; // Kept to reduce changes to the minimum
 	union wpa_event_data event;
 	bool add_br = false;
 	int ret;
-
-	if (ifname_wds && ifname_wds[0]) {
-		os_strlcpy(name, ifname_wds, sizeof(name));
-	} else {
-		ret = os_snprintf(name, sizeof(name), "%s.sta%d", bss->ifname,
-				  aid);
-		if (ret >= (int) sizeof(name))
-			wpa_printf(MSG_WARNING,
-				   "nl80211: WDS interface name was truncated");
-		else if (ret < 0)
-			return ret;
-	}
 
 	wpa_printf(MSG_DEBUG, "nl80211: Set WDS STA addr=" MACSTR
 		   " aid=%d val=%d name=%s", MAC2STR(addr), aid, val, name);
@@ -8985,7 +8984,8 @@ static int i802_set_wds_sta(void *priv, const u8 *addr, int aid, int val,
 		if (!if_nametoindex(name)) {
 			if (nl80211_create_iface(drv, name,
 						 NL80211_IFTYPE_AP_VLAN,
-						 bss->addr, 1, NULL, NULL, 0) <
+						 bss->addr, 1, bss->radio_mask,
+						 NULL, NULL, 0) <
 			    0)
 				return -1;
 
@@ -9359,7 +9359,8 @@ static int wpa_driver_nl80211_if_add(void *priv, enum wpa_driver_if_type type,
 
 		os_memset(&nonnetdev_info, 0, sizeof(nonnetdev_info));
 		ifidx = nl80211_create_iface(drv, ifname, nlmode, addr,
-					     0, nl80211_wdev_handler,
+					     0, bss->radio_mask,
+					     nl80211_wdev_handler,
 					     &nonnetdev_info, use_existing);
 		if (!nonnetdev_info.wdev_id_set || ifidx != 0) {
 			wpa_printf(MSG_ERROR,
@@ -9378,7 +9379,8 @@ static int wpa_driver_nl80211_if_add(void *priv, enum wpa_driver_if_type type,
 			   (long long unsigned int) nonnetdev_info.wdev_id);
 	} else {
 		ifidx = nl80211_create_iface(drv, ifname, nlmode, addr,
-					     0, NULL, NULL, use_existing);
+					     0, bss->radio_mask,
+					     NULL, NULL, use_existing);
 		if (use_existing && ifidx == -ENFILE) {
 			added = 0;
 			ifidx = if_nametoindex(ifname);
@@ -11982,6 +11984,10 @@ static int nl80211_switch_channel(void *priv, struct csa_settings *settings)
 	if (ret)
 		goto error;
 
+	if (drv->nlmode == NL80211_IFTYPE_MESH_POINT) {
+		nla_put_flag(msg, NL80211_ATTR_HANDLE_DFS);
+	}
+
 	/* beacon_csa params */
 	beacon_csa = nla_nest_start(msg, NL80211_ATTR_CSA_IES);
 	if (!beacon_csa)
@@ -13070,17 +13076,18 @@ static const char * drv_br_net_param_str(enum drv_br_net_param param)
 
 
 static int wpa_driver_br_set_net_param(void *priv, enum drv_br_net_param param,
-				       unsigned int val)
+				       const char *ifname, unsigned int val)
 {
 	struct i802_bss *bss = priv;
 	char path[128];
 	const char *param_txt;
+	const char *br = ifname && ifname[0] ? ifname : bss->brname;
 	int ip_version = 4;
 
 	if (param == DRV_BR_MULTICAST_SNOOPING) {
 		os_snprintf(path, sizeof(path),
 			    "/sys/devices/virtual/net/%s/bridge/multicast_snooping",
-			    bss->brname);
+			    br);
 		goto set_val;
 	}
 
@@ -13097,7 +13104,7 @@ static int wpa_driver_br_set_net_param(void *priv, enum drv_br_net_param param,
 	}
 
 	os_snprintf(path, sizeof(path), "/proc/sys/net/ipv%d/conf/%s/%s",
-		    ip_version, bss->brname, param_txt);
+		    ip_version, br, param_txt);
 
 set_val:
 	if (linux_write_system_file(path, val))
