@@ -1235,8 +1235,17 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 	    (data.num_pmkid != 1 || !data.pmkid || !sm->pmk_r1_name_valid ||
 	     os_memcmp_const(data.pmkid, sm->pmk_r1_name,
 			     WPA_PMK_NAME_LEN) != 0)) {
-		wpa_auth_vlogger(wpa_auth, sm->addr, LOGGER_DEBUG,
-				 "No PMKR1Name match for FILS+FT");
+		wpa_auth_vlogger(wpa_auth, sm->addr, LOGGER_WARNING,
+				 "FT: PMKR1Name mismatch for FILS+FT (num_pmkid=%zu pmk_r1_name_valid=%d)",
+				 data.num_pmkid, sm->pmk_r1_name_valid);
+		if (sm->pmk_r1_name_valid) {
+			wpa_hexdump(MSG_WARNING, "FT: PMKR1Name expected",
+				    sm->pmk_r1_name, WPA_PMK_NAME_LEN);
+		}
+		if (data.pmkid && data.num_pmkid) {
+			wpa_hexdump(MSG_WARNING, "FT: PMKID[0] from STA",
+				    data.pmkid, PMKID_LEN);
+		}
 		return WPA_INVALID_PMKID;
 	}
 #endif /* CONFIG_IEEE80211R_AP && CONFIG_FILS */
@@ -1342,8 +1351,13 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 		 * (Re)Association Request frame. */
 		if (!ap_sae_offload && data.num_pmkid && !sm->pmksa &&
 		    sm->auth_alg == WLAN_AUTH_OPEN) {
-			wpa_auth_vlogger(wpa_auth, sm->addr, LOGGER_DEBUG,
-					 "No PMKSA cache entry found for SAE");
+			wpa_auth_vlogger(wpa_auth, sm->addr, LOGGER_WARNING,
+					 "FT: No PMKSA cache entry found for SAE (num_pmkid=%zu)",
+					 data.num_pmkid);
+			if (data.pmkid && data.num_pmkid) {
+				wpa_hexdump(MSG_WARNING, "FT: PMKID[0] from STA",
+					    data.pmkid, PMKID_LEN);
+			}
 			return WPA_INVALID_PMKID;
 		}
 	}
@@ -1351,8 +1365,13 @@ wpa_validate_wpa_ie(struct wpa_authenticator *wpa_auth,
 
 #ifdef CONFIG_DPP
 	if (sm->wpa_key_mgmt == WPA_KEY_MGMT_DPP && !sm->pmksa) {
-		wpa_auth_vlogger(wpa_auth, sm->addr, LOGGER_DEBUG,
-				 "No PMKSA cache entry found for DPP");
+		wpa_auth_vlogger(wpa_auth, sm->addr, LOGGER_WARNING,
+				 "FT: No PMKSA cache entry found for DPP (num_pmkid=%zu)",
+				 data.num_pmkid);
+		if (data.pmkid && data.num_pmkid) {
+			wpa_hexdump(MSG_WARNING, "FT: PMKID[0] from STA",
+				    data.pmkid, PMKID_LEN);
+		}
 		return WPA_INVALID_PMKID;
 	}
 #endif /* CONFIG_DPP */

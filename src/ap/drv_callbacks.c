@@ -708,6 +708,10 @@ int hostapd_notif_assoc(struct hostapd_data *hapd, const u8 *addr,
 		case WPA_INVALID_PMKID:
 			reason = WLAN_REASON_INVALID_PMKID;
 			status = WLAN_STATUS_INVALID_PMKID;
+			wpa_printf(MSG_WARNING,
+				   "FT: reject assoc due to invalid PMKID (status=%u reason=%u) for STA "
+				   MACSTR,
+				   status, reason, MAC2STR(sta->addr));
 			break;
 		case WPA_DENIED_OTHER_REASON:
 			reason = WLAN_REASON_UNSPECIFIED;
