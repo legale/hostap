@@ -545,6 +545,9 @@ void vlan_newlink(const char *ifname, struct hostapd_data *hapd)
 	if (!vlan)
 		return;
 
+	if (hapd->conf->ssid.vlan_no_bridge)
+		goto out;
+
 	vlan->configured = 1;
 
 	notempty = vlan->vlan_desc.notempty;
@@ -576,6 +579,7 @@ void vlan_newlink(const char *ifname, struct hostapd_data *hapd)
 				    ifname, br_name, tagged[i], hapd);
 	}
 
+out:
 	ifconfig_up(ifname);
 }
 

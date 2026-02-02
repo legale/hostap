@@ -177,6 +177,10 @@ void hostapd_config_defaults_bss(struct hostapd_bss_config *bss)
 	bss->pasn_comeback_after = 10;
 	bss->pasn_noauth = 1;
 #endif /* CONFIG_PASN */
+
+#ifdef CONFIG_IEEE80211BE
+	bss->mld_link_id = -1;
+#endif
 	bss->urnm_mfpr_x20 = -1;
 	bss->urnm_mfpr = -1;
 #ifdef CONFIG_ENC_ASSOC
