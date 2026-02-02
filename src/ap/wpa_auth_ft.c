@@ -1294,6 +1294,12 @@ static void wpa_ft_expire_pmk_r0(void *eloop_ctx, void *timeout_ctx)
 		return;
 	}
 
+	wpa_printf(MSG_WARNING,
+		   "FT: PMK-R0 cache entry expired for STA " MACSTR
+		   " (expires_in=%d session_timeout=%d)",
+		   MAC2STR(r0->spa), expires_in, session_timeout);
+	wpa_hexdump(MSG_WARNING, "FT: PMKR0Name (expired)",
+		    r0->pmk_r0_name, WPA_PMK_NAME_LEN);
 	wpa_ft_free_pmk_r0(r0);
 }
 
@@ -1318,6 +1324,11 @@ static void wpa_ft_expire_pmk_r1(void *eloop_ctx, void *timeout_ctx)
 {
 	struct wpa_ft_pmk_r1_sa *r1 = eloop_ctx;
 
+	wpa_printf(MSG_WARNING,
+		   "FT: PMK-R1 cache entry expired for STA " MACSTR,
+		   MAC2STR(r1->spa));
+	wpa_hexdump(MSG_WARNING, "FT: PMKR1Name (expired)",
+		    r1->pmk_r1_name, WPA_PMK_NAME_LEN);
 	wpa_ft_free_pmk_r1(r1);
 }
 
@@ -1341,13 +1352,28 @@ void wpa_ft_pmk_cache_deinit(struct wpa_ft_pmk_cache *cache)
 	struct wpa_ft_pmk_r0_sa *r0, *r0prev;
 	struct wpa_ft_pmk_r1_sa *r1, *r1prev;
 
+	wpa_printf(MSG_WARNING, "FT: PMK cache deinit");
 	dl_list_for_each_safe(r0, r0prev, &cache->pmk_r0,
-			      struct wpa_ft_pmk_r0_sa, list)
+			      struct wpa_ft_pmk_r0_sa, list) {
+		wpa_printf(MSG_WARNING,
+			   "FT: PMK-R0 cache entry removed for STA " MACSTR
+			   " (deinit)",
+			   MAC2STR(r0->spa));
+		wpa_hexdump(MSG_WARNING, "FT: PMKR0Name (deinit)",
+			    r0->pmk_r0_name, WPA_PMK_NAME_LEN);
 		wpa_ft_free_pmk_r0(r0);
+	}
 
 	dl_list_for_each_safe(r1, r1prev, &cache->pmk_r1,
-			      struct wpa_ft_pmk_r1_sa, list)
+			      struct wpa_ft_pmk_r1_sa, list) {
+		wpa_printf(MSG_WARNING,
+			   "FT: PMK-R1 cache entry removed for STA " MACSTR
+			   " (deinit)",
+			   MAC2STR(r1->spa));
+		wpa_hexdump(MSG_WARNING, "FT: PMKR1Name (deinit)",
+			    r1->pmk_r1_name, WPA_PMK_NAME_LEN);
 		wpa_ft_free_pmk_r1(r1);
+	}
 
 	os_free(cache);
 }
