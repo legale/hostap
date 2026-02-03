@@ -3363,8 +3363,11 @@ static int wpa_ft_process_auth_req(struct wpa_state_machine *sm,
 		goto out;
 	}
 
-	if (wpa_ft_set_key_mgmt(sm, &parse) < 0)
+	if (wpa_ft_set_key_mgmt(sm, &parse) < 0) {
+		wpa_printf(MSG_WARNING,
+			   "FT: Failed to select key management for Auth Request");
 		goto out;
+	}
 
 	wpa_hexdump(MSG_DEBUG, "FT: Requested PMKR0Name",
 		    parse.rsn_pmkid, WPA_PMK_NAME_LEN);
@@ -3373,12 +3376,17 @@ static int wpa_ft_process_auth_req(struct wpa_state_machine *sm,
 	    wpa_key_mgmt_ft_psk(sm->wpa_key_mgmt)) {
 		if (wpa_derive_pmk_r1_name(parse.rsn_pmkid,
 					   sm->wpa_auth->conf.r1_key_holder,
-					   sm->addr, pmk_r1_name, PMK_LEN) < 0)
+					   sm->addr, pmk_r1_name, PMK_LEN) < 0) {
+			wpa_printf(MSG_WARNING,
+				   "FT: Failed to derive PMK-R1 name for FT-PSK");
 			goto out;
+		}
 		if (wpa_ft_psk_pmk_r1(sm, pmk_r1_name, pmk_r1, &pairwise,
 				      &vlan, &identity, &identity_len,
 				      &radius_cui, &radius_cui_len,
 				      &session_timeout) < 0) {
+			wpa_printf(MSG_WARNING,
+				   "FT: Failed to derive PMK-R1 for FT-PSK");
 			retval = WLAN_STATUS_INVALID_PMKID;
 			goto out;
 		}
@@ -3487,6 +3495,8 @@ pmk_r1_derived:
 		    sm->SNonce, WPA_NONCE_LEN);
 
 	if (os_get_reltime(&now) < 0) {
+		wpa_printf(MSG_WARNING,
+			   "FT: Failed to get time for Auth Request");
 		retval = WLAN_STATUS_UNSPECIFIED_FAILURE;
 		goto out;
 	}
@@ -3532,8 +3542,11 @@ pmk_r1_derived:
 				      sm->ANonce, sm->addr,
 				      sm->wpa_auth->addr, pmk_r1_name,
 				      &sm->PTK, ptk_name, parse.key_mgmt,
-				      pairwise, kdk_len) < 0)
+				      pairwise, kdk_len) < 0) {
+			wpa_printf(MSG_WARNING,
+				   "FT: Failed to derive PTK for Auth Request");
 			goto out;
+		}
 		wpa_printf(MSG_WARNING,
 			   "FT: Derived PTK for Auth Request");
 	}
@@ -3720,6 +3733,8 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 	}
 
 	if (os_get_reltime(&now) < 0) {
+		wpa_printf(MSG_WARNING,
+			   "FT: Failed to get time for Reassoc validation");
 		retval = WLAN_STATUS_UNSPECIFIED_FAILURE;
 		goto out;
 	}

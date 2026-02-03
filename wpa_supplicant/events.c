@@ -5984,6 +5984,14 @@ static void wpas_event_assoc_reject(struct wpa_supplicant *wpa_s,
 			STA_CONNECT_FAIL_REASON_UNSPECIFIED ?
 			" qca_driver_reason=" : "",
 			connect_fail_reason(data->assoc_reject.reason_code));
+	if (data->assoc_reject.status_code == WLAN_STATUS_INVALID_PMKID) {
+		wpa_msg(wpa_s, MSG_WARNING,
+			"RSN: PMKID rejected during (Re)Assoc with " MACSTR
+			" (status_code=%u ft_used=%d timed_out=%d reason=%d)",
+			MAC2STR(bssid), data->assoc_reject.status_code,
+			wpa_s->sme.ft_used, data->assoc_reject.timed_out,
+			data->assoc_reject.reason_code);
+	}
 	wpa_s->assoc_status_code = data->assoc_reject.status_code;
 	wpas_notify_assoc_status_code(wpa_s);
 
