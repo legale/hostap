@@ -1716,7 +1716,7 @@ void eapol_sm_notify_pmkid_attempt(struct eapol_sm *sm)
 
 static void eapol_sm_abort_cached(struct eapol_sm *sm)
 {
-	wpa_printf(MSG_DEBUG, "RSN: Authenticator did not accept PMKID, "
+	wpa_printf(MSG_WARNING, "RSN: Authenticator did not accept PMKID, "
 		   "doing full EAP authentication");
 	if (sm == NULL)
 		return;
