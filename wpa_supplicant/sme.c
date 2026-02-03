@@ -2145,6 +2145,12 @@ void sme_event_auth(struct wpa_supplicant *wpa_s, union wpa_event_data *data)
 			data->auth.auth_transaction, data->auth.status_code,
 			ie_txt ? " ie=" : "",
 			ie_txt ? ie_txt : "");
+		if (data->auth.auth_type == WLAN_AUTH_FT)
+			wpa_msg(wpa_s, MSG_WARNING,
+				"FT: Authentication response rejected (transaction=%u status_code=%u peer=" MACSTR ")",
+				data->auth.auth_transaction,
+				data->auth.status_code,
+				MAC2STR(data->auth.peer));
 		os_free(ie_txt);
 
 #ifdef CONFIG_FILS
@@ -2200,8 +2206,8 @@ void sme_event_auth(struct wpa_supplicant *wpa_s, union wpa_event_data *data)
 					    data->auth.ies_len, 0,
 					    data->auth.peer,
 					    ric_ies, ric_ies_len) < 0) {
-			wpa_dbg(wpa_s, MSG_DEBUG,
-				"SME: FT Authentication response processing failed");
+			wpa_msg(wpa_s, MSG_WARNING,
+				"FT: Authentication response processing failed");
 			wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_DISCONNECTED "bssid="
 				MACSTR
 				" reason=%d locally_generated=1",
@@ -2993,6 +2999,14 @@ void sme_event_assoc_reject(struct wpa_supplicant *wpa_s,
 			/* Break out early; comeback error is not a failure. */
 			return;
 		}
+	}
+
+	if (data->assoc_reject.status_code == WLAN_STATUS_INVALID_PMKID) {
+		wpa_msg(wpa_s, MSG_WARNING,
+			"RSN: PMKID rejected during (Re)Assoc with " MACSTR
+			" (status_code=%u ft_used=%d timed_out=%d)",
+			MAC2STR(bssid), data->assoc_reject.status_code,
+			wpa_s->sme.ft_used, data->assoc_reject.timed_out);
 	}
 
 #ifdef CONFIG_SAE
