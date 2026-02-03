@@ -6079,10 +6079,11 @@ static void wpa_supplicant_ctrl_iface_drop_sa(struct wpa_supplicant *wpa_s)
 
 
 static int wpa_supplicant_ctrl_iface_roam(struct wpa_supplicant *wpa_s,
-					  char *addr)
+					  char *addr, char *reply,
+					  size_t reply_size)
 {
 #ifdef CONFIG_NO_SCAN_PROCESSING
-	return -1;
+	return os_snprintf(reply, reply_size, "FAIL-NO-SCAN-PROCESSING\n");
 #else /* CONFIG_NO_SCAN_PROCESSING */
 	u8 bssid[ETH_ALEN];
 	struct wpa_bss *bss;
@@ -6092,7 +6093,8 @@ static int wpa_supplicant_ctrl_iface_roam(struct wpa_supplicant *wpa_s,
 	if (hwaddr_aton(addr, bssid)) {
 		wpa_printf(MSG_DEBUG, "CTRL_IFACE ROAM: invalid "
 			   "address '%s'", addr);
-		return -1;
+		return os_snprintf(reply, reply_size,
+				   "FAIL-INVALID-ADDRESS\n");
 	}
 
 	wpa_printf(MSG_DEBUG, "CTRL_IFACE ROAM " MACSTR, MAC2STR(bssid));
@@ -6100,14 +6102,15 @@ static int wpa_supplicant_ctrl_iface_roam(struct wpa_supplicant *wpa_s,
 	if (!ssid) {
 		wpa_printf(MSG_DEBUG, "CTRL_IFACE ROAM: No network "
 			   "configuration known for the target AP");
-		return -1;
+		return os_snprintf(reply, reply_size, "FAIL-NO-NETWORK\n");
 	}
 
 	bss = wpa_bss_get_connection(wpa_s, bssid, ssid->ssid, ssid->ssid_len);
 	if (!bss) {
 		wpa_printf(MSG_DEBUG, "CTRL_IFACE ROAM: Target AP not found "
 			   "from BSS table");
-		return -1;
+		return os_snprintf(reply, reply_size,
+				   "FAIL-BSS-NOT-FOUND\n");
 	}
 
 	/*
@@ -13895,8 +13898,14 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		wpa_supplicant_ctrl_iface_drop_sa(wpa_s);
 #endif /* CONFIG_TESTING_OPTIONS */
 	} else if (os_strncmp(buf, "ROAM ", 5) == 0) {
-		if (wpa_supplicant_ctrl_iface_roam(wpa_s, buf + 5))
+		int res;
+
+		res = wpa_supplicant_ctrl_iface_roam(wpa_s, buf + 5,
+						     reply, reply_size);
+		if (res < 0)
 			reply_len = -1;
+		else if (res > 0)
+			reply_len = res;
 	} else if (os_strncmp(buf, "STA_AUTOCONNECT ", 16) == 0) {
 		wpa_s->auto_reconnect_disabled = atoi(buf + 16) == 0;
 	} else if (os_strncmp(buf, "BSS_EXPIRE_AGE ", 15) == 0) {
