@@ -37,6 +37,7 @@ const unsigned int ftRRBmaxQueueLen = 100;
 
 /* TODO: make these configurable */
 static const int dot11RSNAConfigPMKLifetime = 43200;
+#define FT_AUTH_REQ_TTL_SEC 3
 
 
 static int wpa_ft_send_rrb_auth_resp(struct wpa_state_machine *sm,
@@ -3207,6 +3208,86 @@ static int wpa_ft_local_derive_pmk_r1(struct wpa_authenticator *wpa_auth,
 }
 
 
+static void wpa_ft_auth_req_hist_expire(struct wpa_state_machine *sm,
+					const struct os_reltime *now)
+{
+	unsigned int i;
+
+	for (i = 0; i < FT_AUTH_REQ_HISTORY_LEN; i++) {
+		struct wpa_ft_auth_req_entry *entry =
+			&sm->ft_auth_req_hist[i];
+
+		if (!entry->valid)
+			continue;
+		if (os_reltime_expired(now, &entry->ts, FT_AUTH_REQ_TTL_SEC))
+			entry->valid = false;
+	}
+}
+
+
+static struct wpa_ft_auth_req_entry *
+wpa_ft_auth_req_hist_find(struct wpa_state_machine *sm, const u8 *snonce,
+			  const u8 *anonce, const u8 *pmk_r1_name,
+			  const struct os_reltime *now)
+{
+	unsigned int i;
+
+	for (i = 0; i < FT_AUTH_REQ_HISTORY_LEN; i++) {
+		struct wpa_ft_auth_req_entry *entry =
+			&sm->ft_auth_req_hist[i];
+
+		if (!entry->valid)
+			continue;
+		if (os_reltime_expired(now, &entry->ts, FT_AUTH_REQ_TTL_SEC)) {
+			entry->valid = false;
+			continue;
+		}
+		if (snonce &&
+		    os_memcmp(entry->snonce, snonce, WPA_NONCE_LEN) != 0)
+			continue;
+		if (anonce &&
+		    os_memcmp(entry->anonce, anonce, WPA_NONCE_LEN) != 0)
+			continue;
+		if (pmk_r1_name &&
+		    os_memcmp(entry->pmk_r1_name, pmk_r1_name,
+			      WPA_PMK_NAME_LEN) != 0)
+			continue;
+		return entry;
+	}
+
+	return NULL;
+}
+
+
+static struct wpa_ft_auth_req_entry *
+wpa_ft_auth_req_hist_insert(struct wpa_state_machine *sm,
+			    const struct os_reltime *now,
+			    const u8 *snonce, const u8 *anonce,
+			    const u8 *pmk_r1_name, size_t pmk_r1_len,
+			    int key_mgmt, int pairwise,
+			    const struct wpa_ptk *ptk)
+{
+	struct wpa_ft_auth_req_entry *entry =
+		&sm->ft_auth_req_hist[sm->ft_auth_req_hist_idx];
+
+	sm->ft_auth_req_hist_idx++;
+	if (sm->ft_auth_req_hist_idx >= FT_AUTH_REQ_HISTORY_LEN)
+		sm->ft_auth_req_hist_idx = 0;
+
+	os_memcpy(entry->snonce, snonce, WPA_NONCE_LEN);
+	os_memcpy(entry->anonce, anonce, WPA_NONCE_LEN);
+	os_memcpy(entry->pmk_r1_name, pmk_r1_name, WPA_PMK_NAME_LEN);
+	entry->pmk_r1_len = pmk_r1_len;
+	entry->key_mgmt = key_mgmt;
+	entry->pairwise = pairwise;
+	entry->ptk = *ptk;
+	entry->ts = *now;
+	entry->valid = true;
+
+	return entry;
+}
+
+
 static int wpa_ft_process_auth_req(struct wpa_state_machine *sm,
 				   const u8 *ies, size_t ies_len,
 				   u8 **resp_ies, size_t *resp_ies_len)
@@ -3227,6 +3308,8 @@ static int wpa_ft_process_auth_req(struct wpa_state_machine *sm,
 	int retval = WLAN_STATUS_UNSPECIFIED_FAILURE;
 	struct os_reltime now;
 	struct rsn_ftie *ftie;
+	struct wpa_ft_auth_req_entry *entry = NULL;
+	bool reuse_entry = false;
 
 	*resp_ies = NULL;
 	*resp_ies_len = 0;
@@ -3236,6 +3319,8 @@ static int wpa_ft_process_auth_req(struct wpa_state_machine *sm,
 
 	wpa_hexdump(MSG_DEBUG, "FT: Received authentication frame IEs",
 		    ies, ies_len);
+	wpa_printf(MSG_WARNING,
+		   "FT: Received Auth Request; starting SNonce/ANonce/PTK handling");
 
 	if (wpa_ft_parse_ies(ies, ies_len, &parse, 0, false)) {
 		wpa_printf(MSG_WARNING, "FT: Failed to parse FT IEs");
@@ -3361,20 +3446,6 @@ pmk_r1_derived:
 	os_memcpy(sm->pmk_r1, pmk_r1, pmk_r1_len);
 	sm->pmk_r1_len = pmk_r1_len;
 
-	if (os_get_reltime(&now) < 0 ||
-	    os_reltime_expired(&now, &sm->ANonce_time, 3)) {
-		if (random_get_bytes(sm->ANonce, WPA_NONCE_LEN)) {
-			wpa_printf(MSG_WARNING, "FT: Failed to get random data for "
-				   "ANonce");
-			return WLAN_STATUS_UNSPECIFIED_FAILURE;
-		}
-		sm->ANonce_time.sec = now.sec;
-		sm->ANonce_time.usec = now.usec;
-		wpa_printf(MSG_WARNING, "FT: ANonce was randomized");
-	} else {
-		wpa_printf(MSG_WARNING, "FT: ANonce has not expired");
-	}
-
 	/* Now that we know the correct PMK-R1 length and as such, the length
 	 * of the MIC field, fetch the SNonce. */
 	if (pmk_r1_len == SHA512_MAC_LEN) {
@@ -3414,8 +3485,40 @@ pmk_r1_derived:
 
 	wpa_hexdump(MSG_DEBUG, "FT: Received SNonce",
 		    sm->SNonce, WPA_NONCE_LEN);
-	wpa_hexdump(MSG_DEBUG, "FT: Generated ANonce",
-		    sm->ANonce, WPA_NONCE_LEN);
+
+	if (os_get_reltime(&now) < 0) {
+		retval = WLAN_STATUS_UNSPECIFIED_FAILURE;
+		goto out;
+	}
+
+	wpa_ft_auth_req_hist_expire(sm, &now);
+	entry = wpa_ft_auth_req_hist_find(sm, sm->SNonce, NULL, pmk_r1_name,
+					  &now);
+	if (entry && entry->key_mgmt == parse.key_mgmt) {
+		reuse_entry = true;
+		os_memcpy(sm->ANonce, entry->anonce, WPA_NONCE_LEN);
+		sm->PTK = entry->ptk;
+		sm->pmk_r1_len = entry->pmk_r1_len;
+		sm->wpa_key_mgmt = entry->key_mgmt;
+		pairwise = entry->pairwise;
+		entry->ts = now;
+		wpa_printf(MSG_WARNING,
+			   "FT: Reusing cached ANonce/PTK for repeated Auth Request (SNonce match)");
+		wpa_hexdump(MSG_WARNING, "FT: Cached ANonce",
+			    sm->ANonce, WPA_NONCE_LEN);
+		wpa_hexdump(MSG_WARNING, "FT: Cached SNonce",
+			    sm->SNonce, WPA_NONCE_LEN);
+	} else {
+		if (random_get_bytes(sm->ANonce, WPA_NONCE_LEN)) {
+			wpa_printf(MSG_WARNING,
+				   "FT: Failed to get random data for ANonce");
+			return WLAN_STATUS_UNSPECIFIED_FAILURE;
+		}
+		wpa_hexdump(MSG_DEBUG, "FT: Generated ANonce",
+			    sm->ANonce, WPA_NONCE_LEN);
+		wpa_hexdump(MSG_WARNING, "FT: Generated ANonce",
+			    sm->ANonce, WPA_NONCE_LEN);
+	}
 
 	if (sm->wpa_auth->conf.force_kdk_derivation ||
 	    (sm->wpa_auth->conf.secure_ltf &&
@@ -3424,14 +3527,20 @@ pmk_r1_derived:
 	else
 		kdk_len = 0;
 
-	if (wpa_pmk_r1_to_ptk(pmk_r1, pmk_r1_len, sm->SNonce, sm->ANonce,
-			      sm->addr, sm->wpa_auth->addr, pmk_r1_name,
-			      &sm->PTK, ptk_name, parse.key_mgmt,
-			      pairwise, kdk_len) < 0)
-		goto out;
+	if (!reuse_entry) {
+		if (wpa_pmk_r1_to_ptk(pmk_r1, pmk_r1_len, sm->SNonce,
+				      sm->ANonce, sm->addr,
+				      sm->wpa_auth->addr, pmk_r1_name,
+				      &sm->PTK, ptk_name, parse.key_mgmt,
+				      pairwise, kdk_len) < 0)
+			goto out;
+		wpa_printf(MSG_WARNING,
+			   "FT: Derived PTK for Auth Request");
+	}
 
 #ifdef CONFIG_PASN
-	if (sm->wpa_auth->conf.secure_ltf &&
+	if (!reuse_entry &&
+	    sm->wpa_auth->conf.secure_ltf &&
 	    ieee802_11_rsnx_capab(sm->rsnxe, WLAN_RSNX_CAPAB_SECURE_LTF) &&
 	    wpa_ltf_keyseed(&sm->PTK, parse.key_mgmt, pairwise)) {
 		wpa_printf(MSG_WARNING, "FT: Failed to derive LTF keyseed");
@@ -3439,10 +3548,18 @@ pmk_r1_derived:
 	}
 #endif /* CONFIG_PASN */
 
+	if (!reuse_entry) {
+		entry = wpa_ft_auth_req_hist_insert(sm, &now, sm->SNonce,
+						    sm->ANonce, pmk_r1_name,
+						    pmk_r1_len, parse.key_mgmt,
+						    pairwise, &sm->PTK);
+	}
+
 	sm->pairwise = pairwise;
 	sm->PTK_valid = true;
 	sm->tk_already_set = false;
 	wpa_auth_add_sta_ft(sm->wpa_auth, sm->addr);
+	wpa_printf(MSG_WARNING, "FT: Installing PTK to driver");
 	wpa_ft_install_ptk(sm, 0);
 
 	if (wpa_ft_set_vlan(sm->wpa_auth, sm->addr, &vlan) < 0) {
@@ -3554,6 +3671,16 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 	size_t kck_len;
 	struct wpa_auth_config *conf;
 	int retval = WLAN_STATUS_UNSPECIFIED_FAILURE;
+	struct wpa_ft_auth_req_entry *entry = NULL;
+	struct os_reltime now;
+	u8 saved_ANonce[WPA_NONCE_LEN];
+	u8 saved_SNonce[WPA_NONCE_LEN];
+	u8 saved_pmk_r1_name[WPA_PMK_NAME_LEN];
+	struct wpa_ptk saved_PTK;
+	size_t saved_pmk_r1_len = 0;
+	int saved_pairwise = 0;
+	int saved_key_mgmt = 0;
+	bool state_saved = false;
 
 	if (sm == NULL)
 		return WLAN_STATUS_UNSPECIFIED_FAILURE;
@@ -3579,14 +3706,6 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 		goto out;
 	}
 
-	if (os_memcmp_const(parse.rsn_pmkid, sm->pmk_r1_name, WPA_PMK_NAME_LEN)
-	    != 0) {
-		wpa_printf(MSG_WARNING, "FT: PMKID in Reassoc Req did not match "
-			   "with the PMKR1Name derived from auth request");
-		retval = WLAN_STATUS_INVALID_PMKID;
-		goto out;
-	}
-
 	mdie = (struct rsn_mdie *) parse.mdie;
 	if (mdie == NULL || parse.mdie_len < sizeof(*mdie) ||
 	    os_memcmp(mdie->mobility_domain, conf->mobility_domain,
@@ -3595,6 +3714,49 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 		retval = WLAN_STATUS_INVALID_MDIE;
 		goto out;
 	}
+
+	if (!parse.ftie || !parse.fte_anonce || !parse.fte_snonce) {
+		wpa_printf(MSG_WARNING, "FT: Invalid FTE");
+		retval = WLAN_STATUS_INVALID_FTIE;
+		goto out;
+	}
+
+	if (os_get_reltime(&now) < 0) {
+		retval = WLAN_STATUS_UNSPECIFIED_FAILURE;
+		goto out;
+	}
+	wpa_ft_auth_req_hist_expire(sm, &now);
+	entry = wpa_ft_auth_req_hist_find(sm, parse.fte_snonce,
+					  parse.fte_anonce,
+					  parse.rsn_pmkid, &now);
+	if (!entry) {
+		wpa_printf(MSG_WARNING,
+			   "FT: No matching FT auth entry for received SNonce/ANonce");
+		wpa_hexdump(MSG_WARNING, "FT: Received SNonce",
+			    parse.fte_snonce, WPA_NONCE_LEN);
+		wpa_hexdump(MSG_WARNING, "FT: Received ANonce",
+			    parse.fte_anonce, WPA_NONCE_LEN);
+		retval = WLAN_STATUS_INVALID_FTIE;
+		goto out;
+	}
+	entry->ts = now;
+
+	saved_key_mgmt = sm->wpa_key_mgmt;
+	saved_pairwise = sm->pairwise;
+	saved_pmk_r1_len = sm->pmk_r1_len;
+	os_memcpy(saved_pmk_r1_name, sm->pmk_r1_name, WPA_PMK_NAME_LEN);
+	os_memcpy(saved_ANonce, sm->ANonce, WPA_NONCE_LEN);
+	os_memcpy(saved_SNonce, sm->SNonce, WPA_NONCE_LEN);
+	saved_PTK = sm->PTK;
+	state_saved = true;
+
+	sm->wpa_key_mgmt = entry->key_mgmt;
+	sm->pairwise = entry->pairwise;
+	sm->pmk_r1_len = entry->pmk_r1_len;
+	os_memcpy(sm->pmk_r1_name, entry->pmk_r1_name, WPA_PMK_NAME_LEN);
+	os_memcpy(sm->ANonce, entry->anonce, WPA_NONCE_LEN);
+	os_memcpy(sm->SNonce, entry->snonce, WPA_NONCE_LEN);
+	sm->PTK = entry->ptk;
 
 	if (sm->wpa_key_mgmt == WPA_KEY_MGMT_FT_SAE_EXT_KEY &&
 	    sm->pmk_r1_len == SHA512_MAC_LEN)
@@ -3606,8 +3768,7 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 	else
 		mic_len = 16;
 
-	if (!parse.ftie || !parse.fte_anonce || !parse.fte_snonce ||
-	    parse.fte_mic_len != mic_len) {
+	if (parse.fte_mic_len != mic_len) {
 		wpa_printf(MSG_WARNING,
 			   "FT: Invalid FTE (fte_mic_len=%zu mic_len=%zu)",
 			   parse.fte_mic_len, mic_len);
@@ -3615,23 +3776,11 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 		goto out;
 	}
 
-	if (os_memcmp(parse.fte_snonce, sm->SNonce, WPA_NONCE_LEN) != 0) {
-		wpa_printf(MSG_WARNING, "FT: SNonce mismatch in FTIE");
-		wpa_hexdump(MSG_DEBUG, "FT: Received SNonce",
-			    parse.fte_snonce, WPA_NONCE_LEN);
-		wpa_hexdump(MSG_DEBUG, "FT: Expected SNonce",
-			    sm->SNonce, WPA_NONCE_LEN);
-		retval = WLAN_STATUS_INVALID_FTIE;
-		goto out;
-	}
-
-	if (os_memcmp(parse.fte_anonce, sm->ANonce, WPA_NONCE_LEN) != 0) {
-		wpa_printf(MSG_DEBUG, "FT: ANonce mismatch in FTIE");
-		wpa_hexdump(MSG_DEBUG, "FT: Received ANonce",
-			    parse.fte_anonce, WPA_NONCE_LEN);
-		wpa_hexdump(MSG_DEBUG, "FT: Expected ANonce",
-			    sm->ANonce, WPA_NONCE_LEN);
-		retval = WLAN_STATUS_INVALID_FTIE;
+	if (os_memcmp_const(parse.rsn_pmkid, sm->pmk_r1_name,
+			    WPA_PMK_NAME_LEN) != 0) {
+		wpa_printf(MSG_WARNING,
+			   "FT: PMKID in Reassoc Req did not match with a cached PMKR1Name");
+		retval = WLAN_STATUS_INVALID_PMKID;
 		goto out;
 	}
 
@@ -3672,15 +3821,6 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 		goto out;
 	}
 
-	if (parse.rsn_pmkid == NULL ||
-	    os_memcmp_const(parse.rsn_pmkid, sm->pmk_r1_name, WPA_PMK_NAME_LEN))
-	{
-		wpa_printf(MSG_WARNING, "FT: No matching PMKR1Name (PMKID) in "
-			   "RSNIE (pmkid=%d)", !!parse.rsn_pmkid);
-		retval = WLAN_STATUS_INVALID_PMKID;
-		goto out;
-	}
-
 	count = 3;
 	if (parse.ric)
 		count += ieee802_11_ie_count(parse.ric, parse.ric_len);
@@ -3713,6 +3853,7 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 		wpa_printf(MSG_WARNING, "FT: Failed to calculate MIC");
 		goto out;
 	}
+	wpa_printf(MSG_WARNING, "FT: MIC calculated for Reassoc Request");
 
 	if (os_memcmp_const(mic, parse.fte_mic, mic_len) != 0) {
 		wpa_printf(MSG_WARNING, "FT: Invalid MIC in FTIE");
@@ -3733,6 +3874,7 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 		retval = WLAN_STATUS_INVALID_FTIE;
 		goto out;
 	}
+	wpa_printf(MSG_WARNING, "FT: MIC verification succeeded");
 
 	if (parse.fte_rsnxe_used &&
 	    (conf->sae_pwe == SAE_PWE_HASH_TO_ELEMENT ||
@@ -3785,6 +3927,16 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 
 	retval = WLAN_STATUS_SUCCESS;
 out:
+	if (state_saved && retval != WLAN_STATUS_SUCCESS) {
+		sm->wpa_key_mgmt = saved_key_mgmt;
+		sm->pairwise = saved_pairwise;
+		sm->pmk_r1_len = saved_pmk_r1_len;
+		os_memcpy(sm->pmk_r1_name, saved_pmk_r1_name,
+			  WPA_PMK_NAME_LEN);
+		os_memcpy(sm->ANonce, saved_ANonce, WPA_NONCE_LEN);
+		os_memcpy(sm->SNonce, saved_SNonce, WPA_NONCE_LEN);
+		sm->PTK = saved_PTK;
+	}
 	wpa_ft_parse_ies_free(&parse);
 	return retval;
 }
