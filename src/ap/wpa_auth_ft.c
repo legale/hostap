@@ -2943,7 +2943,7 @@ void wpa_ft_install_ptk(struct wpa_state_machine *sm, int retry)
 	if (sm->tk_already_set) {
 		/* Must avoid TK reconfiguration to prevent clearing of TX/RX
 		 * PN in the driver */
-		wpa_printf(MSG_DEBUG,
+		wpa_printf(MSG_WARNING,
 			   "FT: Do not re-install same PTK to the driver");
 		return;
 	}
@@ -3528,8 +3528,6 @@ pmk_r1_derived:
 	sm->PTK_valid = true;
 	sm->tk_already_set = false;
 	wpa_auth_add_sta_ft(sm->wpa_auth, sm->addr);
-	wpa_printf(MSG_WARNING, "FT: Installing PTK to driver");
-	wpa_ft_install_ptk(sm, 0);
 
 	if (wpa_ft_set_vlan(sm->wpa_auth, sm->addr, &vlan) < 0) {
 		wpa_printf(MSG_WARNING, "FT: Failed to configure VLAN");
@@ -3844,6 +3842,8 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 		goto out;
 	}
 	wpa_printf(MSG_WARNING, "FT: MIC verification succeeded");
+	wpa_printf(MSG_WARNING, "FT: Installing PTK to driver");
+	wpa_ft_install_ptk(sm, 0);
 
 	if (parse.fte_rsnxe_used &&
 	    (conf->sae_pwe == SAE_PWE_HASH_TO_ELEMENT ||
