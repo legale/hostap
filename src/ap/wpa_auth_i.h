@@ -17,6 +17,22 @@
 
 struct wpa_group;
 
+#ifdef CONFIG_IEEE80211R_AP
+#define FT_AUTH_REQ_HISTORY_LEN 4
+
+struct wpa_ft_auth_req_entry {
+	u8 anonce[WPA_NONCE_LEN];
+	u8 snonce[WPA_NONCE_LEN];
+	u8 pmk_r1_name[WPA_PMK_NAME_LEN];
+	size_t pmk_r1_len;
+	int key_mgmt;
+	int pairwise;
+	struct wpa_ptk ptk;
+	struct os_reltime ts;
+	bool valid;
+};
+#endif /* CONFIG_IEEE80211R_AP */
+
 struct wpa_state_machine {
 	struct hostapd_data *hapd;
 	struct wpa_authenticator *wpa_auth;
@@ -57,7 +73,8 @@ struct wpa_state_machine {
 	bool GUpdateStationKeys;
 	u8 ANonce[WPA_NONCE_LEN];
 #ifdef CONFIG_IEEE80211R_AP
-	struct os_reltime ANonce_time;
+	struct wpa_ft_auth_req_entry ft_auth_req_hist[FT_AUTH_REQ_HISTORY_LEN];
+	unsigned int ft_auth_req_hist_idx;
 #endif /* CONFIG_IEEE80211R_AP */
 	u8 SNonce[WPA_NONCE_LEN];
 	u8 alt_SNonce[WPA_NONCE_LEN];
