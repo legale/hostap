@@ -15,6 +15,7 @@
 
 #include "nl80211_copy.h"
 #include "utils/list.h"
+#include "utils/os.h"
 #include "driver.h"
 
 #ifndef NL_CAPABILITY_VERSION_3_5_0
@@ -161,6 +162,8 @@ struct wpa_driver_nl80211_data {
 
 	u8 auth_bssid[ETH_ALEN];
 	u8 auth_attempt_bssid[ETH_ALEN];
+	struct os_reltime auth_req_time;
+	u8 auth_req_bssid[ETH_ALEN];
 	u8 bssid[ETH_ALEN];
 	u8 prev_bssid[ETH_ALEN];
 	int associated;

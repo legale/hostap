@@ -46,6 +46,11 @@ int l2_packet_get_own_addr(struct l2_packet_data *l2, u8 *addr)
 	return 0;
 }
 
+int l2_packet_refresh_ifindex(struct l2_packet_data *l2)
+{
+	return 0;
+}
+
 
 #ifndef CONFIG_WINPCAP
 static int l2_packet_init_libdnet(struct l2_packet_data *l2)

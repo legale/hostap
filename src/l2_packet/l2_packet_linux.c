@@ -18,7 +18,6 @@
 #include "crypto/crypto.h"
 #include "l2_packet.h"
 
-
 struct l2_packet_data {
 	int fd; /* packet socket for EAPOL frames */
 	char ifname[IFNAMSIZ + 1];
@@ -105,7 +104,7 @@ static const struct sock_fprog pkt_type_sock_filter = {
 	.filter = pkt_type_filter_insns,
 };
 
-static int l2_packet_refresh_ifindex(struct l2_packet_data *l2)
+int l2_packet_refresh_ifindex(struct l2_packet_data *l2)
 {
 	struct ifreq ifr;
 	struct sockaddr_ll ll;

@@ -4594,6 +4594,11 @@ retry:
 	} else {
 		wpa_printf(MSG_DEBUG,
 			   "nl80211: Authentication request send successfully");
+		os_get_reltime(&drv->auth_req_time);
+		if (params->bssid)
+			os_memcpy(drv->auth_req_bssid, params->bssid, ETH_ALEN);
+		else
+			os_memset(drv->auth_req_bssid, 0, ETH_ALEN);
 	}
 
 fail:
