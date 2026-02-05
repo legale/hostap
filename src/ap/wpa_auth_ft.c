@@ -2949,7 +2949,7 @@ static inline int wpa_auth_add_sta_ft(struct wpa_authenticator *wpa_auth,
 }
 
 
-void wpa_ft_install_ptk(struct wpa_state_machine *sm, int retry)
+void wpa_ft_install_ptk(struct wpa_state_machine *sm)
 {
 	enum wpa_alg alg;
 	int klen;
@@ -3880,8 +3880,8 @@ int wpa_ft_validate_reassoc(struct wpa_state_machine *sm, const u8 *ies,
 		goto out;
 	}
 	wpa_printf(MSG_WARNING, "FT: MIC verification succeeded");
-	wpa_printf(MSG_WARNING, "FT: Installing PTK to driver");
-	wpa_ft_install_ptk(sm, 0);
+	wpa_printf(MSG_WARNING, "FT: Installing PTK to driver before assoc/reassoc skipped to avoid kernel failed error");
+	//wpa_ft_install_ptk(sm);
 
 	if (parse.fte_rsnxe_used &&
 	    (conf->sae_pwe == SAE_PWE_HASH_TO_ELEMENT ||

@@ -376,7 +376,7 @@ void wpa_auth_ft_store_keys(struct wpa_state_machine *sm, const u8 *pmk_r0,
 			    size_t key_len);
 struct wpa_ft_pmk_cache * wpa_ft_pmk_cache_init(void);
 void wpa_ft_pmk_cache_deinit(struct wpa_ft_pmk_cache *cache);
-void wpa_ft_install_ptk(struct wpa_state_machine *sm, int retry);
+void wpa_ft_install_ptk(struct wpa_state_machine *sm);
 int wpa_ft_store_pmk_fils(struct wpa_state_machine *sm, const u8 *pmk_r0,
 			  const u8 *pmk_r0_name);
 #endif /* CONFIG_IEEE80211R_AP */
