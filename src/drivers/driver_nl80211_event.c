@@ -20,6 +20,8 @@
 #include "common/ieee802_11_common.h"
 #include "driver_nl80211.h"
 
+#define NL80211_SPURIOUS_AUTH_TIMEOUT_MS 100
+
 
 static void
 nl80211_control_port_frame_tx_status(struct i802_bss *bss,
@@ -1408,6 +1410,25 @@ static void mlme_timeout_event(struct wpa_driver_nl80211_data *drv,
 
 	os_memset(&event, 0, sizeof(event));
 	os_memcpy(event.timeout_event.addr, nla_data(addr), ETH_ALEN);
+	if (ev == EVENT_AUTH_TIMED_OUT &&
+	    os_reltime_initialized(&drv->auth_req_time) &&
+	    !is_zero_ether_addr(drv->auth_req_bssid) &&
+	    ether_addr_equal(event.timeout_event.addr, drv->auth_req_bssid)) {
+		struct os_reltime age;
+		int age_ms;
+
+		os_reltime_age(&drv->auth_req_time, &age);
+		age_ms = os_reltime_in_ms(&age);
+		if (age_ms >= 0 && age_ms < NL80211_SPURIOUS_AUTH_TIMEOUT_MS) {
+			wpa_printf(MSG_WARNING,
+				   "nl80211: ignoring MLME auth timeout for " MACSTR
+				   " (age=%d ms < %d ms)",
+				   MAC2STR(event.timeout_event.addr),
+				   age_ms, NL80211_SPURIOUS_AUTH_TIMEOUT_MS);
+			return;
+		}
+	}
+
 	wpa_supplicant_event(drv->ctx, ev, &event);
 }
 

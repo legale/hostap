@@ -2539,9 +2539,8 @@ int wpa_auth_sm_event(struct wpa_state_machine *sm, enum wpa_event event)
 		break;
 	case WPA_ASSOC_FT:
 #ifdef CONFIG_IEEE80211R_AP
-		wpa_printf(MSG_DEBUG,
-			   "FT: Retry PTK configuration after association");
-		wpa_ft_install_ptk(sm, 1);
+		wpa_printf(MSG_DEBUG, "FT: Retry PTK configuration after association");
+		//wpa_ft_install_ptk(sm, 1);
 
 		/* Using FT protocol, not WPA auth state machine */
 		sm->ft_completed = 1;
@@ -2552,8 +2551,7 @@ int wpa_auth_sm_event(struct wpa_state_machine *sm, enum wpa_event event)
 #endif /* CONFIG_IEEE80211R_AP */
 	case WPA_ASSOC_FILS:
 #ifdef CONFIG_FILS
-		wpa_printf(MSG_DEBUG,
-			   "FILS: TK configuration after association");
+		wpa_printf(MSG_DEBUG, "FILS: TK configuration after association");
 		fils_set_tk(sm);
 		sm->fils_completed = 1;
 		return 0;

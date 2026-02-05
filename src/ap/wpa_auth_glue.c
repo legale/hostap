@@ -1322,6 +1322,26 @@ static int hostapd_wpa_auth_send_ft_action(void *ctx, const u8 *dst,
 	return res;
 }
 
+static void hostapd_wpa_auth_refresh_ft_iface(void *ctx)
+{
+	struct hostapd_data *hapd = ctx;
+
+	if (hapd->l2)
+		l2_packet_refresh_ifindex(hapd->l2);
+#ifdef CONFIG_ETH_P_OUI
+	if (hapd->oui_pull)
+		eth_p_oui_refresh(hapd->oui_pull);
+	if (hapd->oui_resp)
+		eth_p_oui_refresh(hapd->oui_resp);
+	if (hapd->oui_push)
+		eth_p_oui_refresh(hapd->oui_push);
+	if (hapd->oui_sreq)
+		eth_p_oui_refresh(hapd->oui_sreq);
+	if (hapd->oui_sresp)
+		eth_p_oui_refresh(hapd->oui_sresp);
+#endif /* CONFIG_ETH_P_OUI */
+}
+
 
 static struct wpa_state_machine *
 hostapd_wpa_auth_add_sta(void *ctx, const u8 *sta_addr)
@@ -1912,6 +1932,7 @@ int hostapd_setup_wpa(struct hostapd_data *hapd)
 #endif /* CONFIG_OCV */
 #ifdef CONFIG_IEEE80211R_AP
 		.send_ft_action = hostapd_wpa_auth_send_ft_action,
+		.refresh_ft_iface = hostapd_wpa_auth_refresh_ft_iface,
 		.add_sta = hostapd_wpa_auth_add_sta,
 		.add_sta_ft = hostapd_wpa_auth_add_sta_ft,
 		.set_vlan = hostapd_wpa_auth_set_vlan,

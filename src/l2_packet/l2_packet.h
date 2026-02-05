@@ -100,6 +100,13 @@ void l2_packet_deinit(struct l2_packet_data *l2);
 int l2_packet_get_own_addr(struct l2_packet_data *l2, u8 *addr);
 
 /**
+ * l2_packet_refresh_ifindex - Refresh interface index and rebind if needed
+ * @l2: Pointer to internal l2_packet data from l2_packet_init()
+ * Returns: >0 if rebound, 0 if unchanged, <0 on failure
+ */
+int l2_packet_refresh_ifindex(struct l2_packet_data *l2);
+
+/**
  * l2_packet_send - Send a packet
  * @l2: Pointer to internal l2_packet data from l2_packet_init()
  * @dst_addr: Destination address for the packet (only used if l2_hdr == 0)

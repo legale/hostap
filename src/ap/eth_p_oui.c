@@ -47,6 +47,13 @@ void eth_p_oui_deliver(struct eth_p_oui_ctx *ctx, const u8 *src_addr,
 			 ctx->oui_suffix, buf, len);
 }
 
+void eth_p_oui_refresh(struct eth_p_oui_ctx *ctx)
+{
+	if (!ctx || !ctx->iface || !ctx->iface->l2)
+		return;
+	l2_packet_refresh_ifindex(ctx->iface->l2);
+}
+
 
 static void eth_p_rx(void *ctx, const u8 *src_addr, const u8 *buf, size_t len)
 {
