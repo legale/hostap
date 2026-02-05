@@ -601,7 +601,7 @@ out:
 	if (wpa_ft_rrb_get_tlv(srcfield, srcfield##_len, type, \
 				&f_##field##_len, &f_##field) < 0 || \
 	    (checklength > 0 && ((size_t) checklength) != f_##field##_len)) { \
-		wpa_printf(MSG_INFO, "FT: Missing required " #field \
+		wpa_printf(MSG_ERROR, "FT: Missing required " #field \
 			   " in %s from " MACSTR, txt, MAC2STR(src_addr)); \
 		wpa_ft_rrb_dump(srcfield, srcfield##_len); \
 		goto out; \
@@ -632,11 +632,22 @@ out:
 static int wpa_ft_rrb_send(struct wpa_authenticator *wpa_auth, const u8 *dst,
 			   const u8 *data, size_t data_len)
 {
-	if (wpa_auth->cb->send_ether == NULL)
+	int ret;
+
+	if (wpa_auth->cb->send_ether == NULL) {
+		wpa_printf(MSG_ERROR,
+			   "FT: RRB send failed: send_ether not supported");
 		return -1;
+	}
 	wpa_printf(MSG_DEBUG, "FT: RRB send to " MACSTR, MAC2STR(dst));
-	return wpa_auth->cb->send_ether(wpa_auth->cb_ctx, dst, ETH_P_RRB,
-					data, data_len);
+	ret = wpa_auth->cb->send_ether(wpa_auth->cb_ctx, dst, ETH_P_RRB,
+				       data, data_len);
+	if (ret < 0) {
+		wpa_printf(MSG_ERROR,
+			   "FT: RRB send to " MACSTR " failed (ret=%d, len=%zu)",
+			   MAC2STR(dst), ret, data_len);
+	}
+	return ret;
 }
 
 
@@ -644,12 +655,24 @@ static int wpa_ft_rrb_oui_send(struct wpa_authenticator *wpa_auth,
 			       const u8 *dst, u8 oui_suffix,
 			       const u8 *data, size_t data_len)
 {
-	if (!wpa_auth->cb->send_oui)
+	int ret;
+
+	if (!wpa_auth->cb->send_oui) {
+		wpa_printf(MSG_ERROR,
+			   "FT: RRB-OUI send failed: send_oui not supported");
 		return -1;
+	}
 	wpa_printf(MSG_DEBUG, "FT: RRB-OUI type %u send to " MACSTR " (len=%u)",
 		   oui_suffix, MAC2STR(dst), (unsigned int) data_len);
-	return wpa_auth->cb->send_oui(wpa_auth->cb_ctx, dst, oui_suffix, data,
-				      data_len);
+	ret = wpa_auth->cb->send_oui(wpa_auth->cb_ctx, dst, oui_suffix, data,
+				     data_len);
+	if (ret < 0) {
+		wpa_printf(MSG_ERROR,
+			   "FT: RRB-OUI send type %u to " MACSTR
+			   " failed (ret=%d, len=%zu)",
+			   oui_suffix, MAC2STR(dst), ret, data_len);
+	}
+	return ret;
 }
 
 
@@ -4239,7 +4262,15 @@ static int wpa_ft_rrb_rx_pull(struct wpa_authenticator *wpa_auth,
 		    f_r0kh_id, f_r0kh_id_len);
 
 	if (wpa_ft_rrb_check_r0kh(wpa_auth, f_r0kh_id, f_r0kh_id_len)) {
-		wpa_printf(MSG_DEBUG, "FT: R0KH-ID mismatch");
+		wpa_printf(MSG_ERROR,
+			   "FT: R0KH-ID mismatch on " MACSTR " (local len=%zu)",
+			   MAC2STR(wpa_auth->addr),
+			   wpa_auth->conf.r0_key_holder_len);
+		if (wpa_auth->conf.r0_key_holder_len) {
+			wpa_hexdump(MSG_ERROR, "FT: R0KH-ID (local)",
+				    wpa_auth->conf.r0_key_holder,
+				    wpa_auth->conf.r0_key_holder_len);
+		}
 		goto out;
 	}
 
@@ -4256,6 +4287,11 @@ static int wpa_ft_rrb_rx_pull(struct wpa_authenticator *wpa_auth,
 		key = r1kh_wildcard->key;
 		key_len = sizeof(r1kh_wildcard->key);
 	} else {
+		wpa_printf(MSG_ERROR,
+			   "FT: Unknown R1KH-ID in pull request (rx=" MACSTR
+			   " local=" MACSTR ")",
+			   MAC2STR(f_r1kh_id),
+			   MAC2STR(wpa_auth->conf.r1_key_holder));
 		goto out;
 	}
 
@@ -4272,13 +4308,18 @@ static int wpa_ft_rrb_rx_pull(struct wpa_authenticator *wpa_auth,
 		seq_ret = FT_RRB_SEQ_DEFER;
 	}
 
-	if (seq_ret == FT_RRB_SEQ_DROP)
+	if (seq_ret == FT_RRB_SEQ_DROP) {
+		wpa_printf(MSG_ERROR, "FT: RRB pull dropped by seq check");
 		goto out;
+	}
 
 	if (wpa_ft_rrb_decrypt(key, key_len, enc, enc_len, auth, auth_len,
 			       src_addr, FT_PACKET_R0KH_R1KH_PULL,
-			       &plain, &plain_len) < 0)
+			       &plain, &plain_len) < 0) {
+		wpa_printf(MSG_ERROR, "FT: RRB pull decrypt failed from " MACSTR,
+			   MAC2STR(src_addr));
 		goto out;
+	}
 
 	if (!r1kh)
 		r1kh = wpa_ft_rrb_add_r1kh(wpa_auth, r1kh_wildcard, src_addr,
@@ -4413,7 +4454,10 @@ static int wpa_ft_rrb_rx_r1(struct wpa_authenticator *wpa_auth,
 		   MAC2STR(f_r1kh_id));
 
 	if (wpa_ft_rrb_check_r1kh(wpa_auth, f_r1kh_id)) {
-		wpa_printf(MSG_DEBUG, "FT: R1KH-ID mismatch");
+		wpa_printf(MSG_ERROR,
+			   "FT: R1KH-ID mismatch (local=" MACSTR " rx=" MACSTR ")",
+			   MAC2STR(wpa_auth->conf.r1_key_holder),
+			   MAC2STR(f_r1kh_id));
 		goto out;
 	}
 
@@ -4427,6 +4471,10 @@ static int wpa_ft_rrb_rx_r1(struct wpa_authenticator *wpa_auth,
 		key = r0kh_wildcard->key;
 		key_len = sizeof(r0kh_wildcard->key);
 	} else {
+		wpa_printf(MSG_ERROR,
+			   "FT: Unknown R0KH-ID in RRB from " MACSTR
+			   " (len=%zu)",
+			   MAC2STR(src_addr), f_r0kh_id_len);
 		goto out;
 	}
 
@@ -4442,12 +4490,17 @@ static int wpa_ft_rrb_rx_r1(struct wpa_authenticator *wpa_auth,
 		seq_ret = FT_RRB_SEQ_DEFER;
 	}
 
-	if (seq_ret == FT_RRB_SEQ_DROP)
+	if (seq_ret == FT_RRB_SEQ_DROP) {
+		wpa_printf(MSG_ERROR, "FT: RRB dropped by seq check");
 		goto out;
+	}
 
 	if (wpa_ft_rrb_decrypt(key, key_len, enc, enc_len, auth, auth_len,
-			       src_addr, type, &plain, &plain_len) < 0)
+			       src_addr, type, &plain, &plain_len) < 0) {
+		wpa_printf(MSG_ERROR, "FT: RRB decrypt failed from " MACSTR,
+			   MAC2STR(src_addr));
 		goto out;
+	}
 
 	if (!r0kh)
 		r0kh = wpa_ft_rrb_add_r0kh(wpa_auth, r0kh_wildcard, src_addr,
@@ -5213,6 +5266,9 @@ void wpa_ft_push_pmk_r1(struct wpa_authenticator *wpa_auth, const u8 *addr)
 	struct wpa_ft_pmk_cache *cache = wpa_auth->ft_pmk_cache;
 	struct wpa_ft_pmk_r0_sa *r0, *r0found = NULL;
 	struct ft_remote_r1kh *r1kh;
+
+	if (wpa_auth->cb && wpa_auth->cb->refresh_ft_iface)
+		wpa_auth->cb->refresh_ft_iface(wpa_auth->cb_ctx);
 
 	if (!wpa_auth->conf.pmk_r1_push) {
 		wpa_printf(MSG_WARNING, "FT: PMK-R1 push disabled");

@@ -33,6 +33,11 @@ int l2_packet_get_own_addr(struct l2_packet_data *l2, u8 *addr)
 	return 0;
 }
 
+int l2_packet_refresh_ifindex(struct l2_packet_data *l2)
+{
+	return 0;
+}
+
 
 int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 		   const u8 *buf, size_t len)

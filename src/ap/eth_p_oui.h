@@ -24,5 +24,6 @@ int eth_p_oui_send(struct eth_p_oui_ctx *ctx, const u8 *src_addr,
 		   const u8 *dst_addr, const u8 *buf, size_t len);
 void eth_p_oui_deliver(struct eth_p_oui_ctx *ctx, const u8 *src_addr,
 		       const u8 *dst_addr, const u8 *buf, size_t len);
+void eth_p_oui_refresh(struct eth_p_oui_ctx *ctx);
 
 #endif /* ETH_P_OUI_H */
