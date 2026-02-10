@@ -980,14 +980,14 @@ void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bss
     
     rsn_ie = get_ie(pos, left, WLAN_EID_RSN);
     if (!rsn_ie || rsn_ie[1] == 0) {
-        WIFIMON_DEBUG(S_AUTH_HANDLE, "RSN IE not found for mac="MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
+        WIFIMON_DEBUG(S_AUTH_HANDLE, WMC_OK, 0, 0, "RSN_IE_not_found mac=" MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
         return;
     }
     
     rsn_ie_len = rsn_ie[1] + 2;
     
     if (wpa_parse_wpa_ie_rsn(rsn_ie, rsn_ie_len, &rsn_data) != 0) {
-        WIFIMON_DEBUG(S_AUTH_HANDLE, "failed to parse RSN IE for mac="MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
+        WIFIMON_DEBUG(S_AUTH_HANDLE, WMC_OK, 0, 0, "RSN_IE_parse_failed mac=" MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
         return;
     }
     
@@ -1267,13 +1267,13 @@ void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bss
     }
     mgmt_group_name[sizeof(mgmt_group_name) - 1] = '\0';
 
-	WIFIMON_DEBUG(S_AUTH_HANDLE,
+	WIFIMON_DEBUG(S_AUTH_HANDLE, WMC_OK, 0, 0,
 					"mac=" MACSTR " bssid=" MACSTR
 					" group_cipher=%d group_name=%s"
 					" pairwise_cipher=%d pairwise_name=%s"
 					" key_mgmt=%d key_mgmt_name=%s"
-					" rsn_capab=%d "
-					"mgmt_group_cipher=%d mgmt_group_name=%s",
+					" rsn_capab=%d"
+					" mgmt_group_cipher=%d mgmt_group_name=%s",
 					MAC2STR(mac), MAC2STR(bssid), rsn_data.group_cipher,
 					group_name, rsn_data.pairwise_cipher, pairwise_name,
 					rsn_data.key_mgmt, key_mgmt_name, rsn_data.capabilities,

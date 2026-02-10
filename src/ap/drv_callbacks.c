@@ -82,7 +82,7 @@ void hostapd_notify_assoc_fils_finish(struct hostapd_data *hapd,
 				      sta->fils_pending_assoc_is_reassoc,
 				      WLAN_STATUS_SUCCESS,
 				      buf, p - buf);
-	if(sta) WIFIMON_INF(0, "ap_sta_set_authorized authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+	if(sta) WIFIMON_INF(S_AUTHORIZED, WMC_OK, 0, 0, "ap_sta_set_authorized authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	updated = ap_sta_set_authorized_flag(hapd, sta, 1);
 	new_assoc = (sta->flags & WLAN_STA_ASSOC) == 0;
 	sta->flags |= WLAN_STA_AUTH | WLAN_STA_ASSOC;
@@ -970,7 +970,7 @@ skip_wpa_check:
 	    sta->auth_alg == WLAN_AUTH_FILS_SK ||
 	    sta->auth_alg == WLAN_AUTH_FILS_SK_PFS ||
 	    sta->auth_alg == WLAN_AUTH_FILS_PK){
-		if(sta) WIFIMON_INF(0, "ap_sta_set_authorized authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+		if(sta) WIFIMON_INF(S_AUTHORIZED, WMC_OK, 0, 0, "ap_sta_set_authorized authorized mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		updated = ap_sta_set_authorized_flag(hapd, sta, 1);
 	}
 #else /* CONFIG_IEEE80211R_AP || CONFIG_FILS */

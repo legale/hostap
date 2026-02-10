@@ -79,7 +79,7 @@ sm->data ## _ ## state = machine ## _ ## _state;
 #define SM_ENTRY_MA(machine, _state, data) \
 if (!global || sm->data ## _ ## state != machine ## _ ## _state) { \
 	sm->changed = true; \
-	WIFIMON_INF(S_HANDSHAKE, STATE_MACHINE_DEBUG_PREFIX ": mac=" MACSTR " bssid=" MACSTR " " \
+	WIFIMON_INF(S_HANDSHAKE, WMC_OK, 0, 0, STATE_MACHINE_DEBUG_PREFIX ": mac=" MACSTR " bssid=" MACSTR " " \
 		   #machine " entering state " #_state, \
 		   MAC2STR(STATE_MACHINE_ADDR), MAC2STR(STATE_MACHINE_HAPD ? STATE_MACHINE_HAPD->own_addr : zeromac)); \
 } \

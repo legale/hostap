@@ -274,7 +274,7 @@ SM_STATE(EAP, INITIALIZE)
 	sm->num_rounds = 0;
 	sm->num_rounds_short = 0;
 	sm->method_pending = METHOD_PENDING_NONE;
-	WIFIMON_INF(S_AUTH_HANDLE_RADIUS, "WPA_EVENT_EAP_STARTED mac=" MACSTR " bssid=" MACSTR, MAC2STR(sm->peer_addr), MAC2STR(STATE_MACHINE_HAPD ? STATE_MACHINE_HAPD->own_addr : zeromac));
+	WIFIMON_INF(S_AUTH_HANDLE_RADIUS, WMC_OK, 0, 0, "eap_started mac=" MACSTR " bssid=" MACSTR, MAC2STR(sm->peer_addr), MAC2STR(STATE_MACHINE_HAPD ? STATE_MACHINE_HAPD->own_addr : zeromac));
 	wpa_msg(sm->cfg->msg_ctx, MSG_INFO, WPA_EVENT_EAP_STARTED MACSTR, MAC2STR(sm->peer_addr));
 }
 
