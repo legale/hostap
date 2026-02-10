@@ -4244,7 +4244,7 @@ void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 	if (!hapd->conf->ieee802_1x && !hapd->conf->wpa &&
 	    !hapd->conf->osen) {
 		if (sta)
-			WIFIMON_INF(0, "sta authorized mac=" MACSTR " bssid=" MACSTR,
+			WIFIMON_INF(S_AUTHORIZED, WMC_OK, 0, 0, "sta_authorized mac=" MACSTR " bssid=" MACSTR,
 				    MAC2STR(sta->addr),
 				    MAC2STR(hapd->own_addr));
 		if (ap_sta_set_authorized(hapd, sta, 1)) {

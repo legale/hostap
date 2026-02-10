@@ -115,7 +115,7 @@ static void hostapd_acl_query_free(struct hostapd_acl_query_data *query)
 static int hostapd_radius_acl_query(struct hostapd_data *hapd, const u8 *addr,
 				    struct hostapd_acl_query_data *query)
 {
-	WIFIMON_INF(S_AUTH_HANDLE_RADIUS, "mac=" MACSTR " query->addr=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(query->addr), MAC2STR(hapd->own_addr));
+	WIFIMON_INF(S_AUTH_HANDLE_RADIUS, WMC_OK, 0, 0, "radius_acl_query mac=" MACSTR " query_addr=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(query->addr), MAC2STR(hapd->own_addr));
 
 	struct radius_msg *msg;
 	char buf[128];
