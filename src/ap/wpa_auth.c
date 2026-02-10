@@ -1043,6 +1043,8 @@ wpa_auth_sta_init(struct wpa_authenticator *wpa_auth, const u8 *addr,
 		os_memcpy(sm->p2p_dev_addr, p2p_dev_addr, ETH_ALEN);
 
 	sm->wpa_auth = wpa_auth;
+	/* Needed for wifimon state-machine logs (bssid should be hapd->own_addr). */
+	sm->hapd = wpa_auth->hapd;
 	sm->group = wpa_auth->group;
 	wpa_group_get(sm->wpa_auth, sm->group);
 #ifdef CONFIG_IEEE80211BE
