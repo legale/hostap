@@ -7117,14 +7117,14 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 	stype = WLAN_FC_GET_STYPE(fc);
 	switch (stype) {
 	case WLAN_FC_STYPE_AUTH:
-		WIFIMON_INF(S_AUTH_REQ, WMC_OK, 0, 0, "frame=mgmt::auth_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d auth_alg=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.auth.auth_alg));
+		WIFIMON_INF(S_AUTH_REQ, WMC_OK, 0, 0, "frame=mgmt::auth_req session=connect session_start=1 rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d auth_alg=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.auth.auth_alg));
 		break;
 	case WLAN_FC_STYPE_ASSOC_REQ:
-		WIFIMON_INF(S_ASSOC_REQ, WMC_OK, 0, 0, "frame=mgmt::assoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.assoc_req.capab_info));
+		WIFIMON_INF(S_ASSOC_REQ, WMC_OK, 0, 0, "frame=mgmt::assoc_req session=connect session_start=1 rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.assoc_req.capab_info));
 		break;
 	case WLAN_FC_STYPE_ASSOC_RESP: break;
 	case WLAN_FC_STYPE_REASSOC_REQ:
-		WIFIMON_INF(S_REASSOC_REQ, WMC_OK, 0, 0, "frame=mgmt::reassoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.reassoc_req.capab_info));
+		WIFIMON_INF(S_REASSOC_REQ, WMC_OK, 0, 0, "frame=mgmt::reassoc_req session=connect session_start=1 rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d capab_info=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.reassoc_req.capab_info));
 		break;
 	case WLAN_FC_STYPE_REASSOC_RESP: break;
 	case WLAN_FC_STYPE_PROBE_REQ: break;
@@ -7134,10 +7134,10 @@ int ieee802_11_mgmt(struct hostapd_data *hapd, const u8 *buf, size_t len,
 		// WIFIMON_INF(S_UNK, "frame=mgmt::atim rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype);
 		break;
 	case WLAN_FC_STYPE_DISASSOC:
-		WIFIMON_INF(S_DISASSOC_REQ, wifimon_code_from_reason(le_to_host16(mgmt->u.disassoc.reason_code)), 0, le_to_host16(mgmt->u.disassoc.reason_code), "frame=mgmt::disassoc_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d reason_code=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.disassoc.reason_code));
+		WIFIMON_INF(S_DISASSOC_REQ, wifimon_code_from_reason(le_to_host16(mgmt->u.disassoc.reason_code)), 0, le_to_host16(mgmt->u.disassoc.reason_code), "frame=mgmt::disassoc_req session=disconnect session_start=1 rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d reason_code=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.disassoc.reason_code));
 		break;
 	case WLAN_FC_STYPE_DEAUTH:
-		WIFIMON_INF(S_DEAUTH_REQ, wifimon_code_from_reason(le_to_host16(mgmt->u.deauth.reason_code)), 0, le_to_host16(mgmt->u.deauth.reason_code), "frame=mgmt::deauth_req rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d reason_code=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.deauth.reason_code));
+		WIFIMON_INF(S_DEAUTH_REQ, wifimon_code_from_reason(le_to_host16(mgmt->u.deauth.reason_code)), 0, le_to_host16(mgmt->u.deauth.reason_code), "frame=mgmt::deauth_req session=disconnect session_start=1 rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d reason_code=%u", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype, le_to_host16(mgmt->u.deauth.reason_code));
 		break;
 	case WLAN_FC_STYPE_ACTION:
 		WIFIMON_INF(S_AUTH_HANDLE, WMC_OK, 0, 0, "frame=mgmt::action rssi=%d mac=" MACSTR " bssid=" MACSTR " stype=%d", ssi_signal, MAC2STR(mgmt->sa), MAC2STR(mgmt->bssid), stype);
