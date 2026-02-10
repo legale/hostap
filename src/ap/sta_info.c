@@ -288,7 +288,7 @@ void ap_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 	accounting_sta_stop(hapd, sta);
 
 	/* just in case */
-	if(sta) WIFIMON_INF(S_DEAUTHORIZED, WMC_OK, 0, 0, "ap_free_sta deauthorize mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+	if(sta) WIFIMON_INF(S_DEAUTHORIZED, WMC_OK, 0, 0, "ap_free_sta deauthorize session_end=1 mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	hostapd_set_sta_flags(hapd, sta);
 
@@ -1774,7 +1774,8 @@ void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 	if(authorized){
 		WIFIMON_OK(S_AUTHORIZED, WMC_OK, 0, 0, "authorized=%d mac=" MACSTR " bssid=" MACSTR, authorized, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	} else {
-		WIFIMON_OK(S_DEAUTHORIZED, WMC_OK, 0, 0, "authorized=%d session=disconnect session_end=1 mac=" MACSTR " bssid=" MACSTR, authorized, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+		/* End marker is emitted later (ap_free_sta) to include full disconnect tail. */
+		WIFIMON_OK(S_DEAUTHORIZED, WMC_OK, 0, 0, "authorized=%d session=disconnect mac=" MACSTR " bssid=" MACSTR, authorized, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	}
 
 	const u8 *dev_addr = NULL;

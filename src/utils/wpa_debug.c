@@ -868,6 +868,196 @@ void hostapd_logger(void *ctx, const u8 *addr, unsigned int module, int level,
 
 struct hapd_interfaces *global_ifaces = NULL;
 
+/* ------------------------------------------------------------------ */
+/*  wifimon message post-processing                                    */
+/*                                                                     */
+/*  Goal: keep wifimon session fields consistent even when individual  */
+/*  call sites omit `session=...` for intermediate stages.             */
+/* ------------------------------------------------------------------ */
+
+#ifndef ETH_ALEN
+#define ETH_ALEN 6
+#endif
+
+struct wifimon_sta_state {
+	u8 mac[ETH_ALEN];
+	u8 bssid[ETH_ALEN];
+	bool used;
+	bool have_bssid;
+	bool connect_active;
+	bool disconnect_active;
+};
+
+static struct wifimon_sta_state wifimon_states[128];
+
+static int wifimon_parse_mac(const char *s, u8 out[ETH_ALEN])
+{
+	unsigned int b[ETH_ALEN];
+	if (!s || !out)
+		return -1;
+	if (sscanf(s, "%02x:%02x:%02x:%02x:%02x:%02x",
+		   &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != 6)
+		return -1;
+	for (size_t i = 0; i < ETH_ALEN; i++)
+		out[i] = (u8) b[i];
+	return 0;
+}
+
+static bool wifimon_is_zero_mac(const u8 mac[ETH_ALEN])
+{
+	for (size_t i = 0; i < ETH_ALEN; i++) {
+		if (mac[i] != 0)
+			return false;
+	}
+	return true;
+}
+
+static bool wifimon_is_disconnect_stage(int stage)
+{
+	return stage == 12 || stage == 13 || stage == 14 ||
+	       stage == 15 || stage == 16;
+}
+
+static struct wifimon_sta_state *wifimon_get_state(const u8 mac[ETH_ALEN])
+{
+	struct wifimon_sta_state *free_slot = NULL;
+	for (size_t i = 0; i < ARRAY_SIZE(wifimon_states); i++) {
+		if (!wifimon_states[i].used) {
+			if (!free_slot)
+				free_slot = &wifimon_states[i];
+			continue;
+		}
+		if (os_memcmp(wifimon_states[i].mac, mac, ETH_ALEN) == 0)
+			return &wifimon_states[i];
+	}
+	if (!free_slot)
+		free_slot = &wifimon_states[0];
+	os_memset(free_slot, 0, sizeof(*free_slot));
+	os_memcpy(free_slot->mac, mac, ETH_ALEN);
+	free_slot->used = true;
+	return free_slot;
+}
+
+static void wifimon_remove_token(char *msg, const char *token)
+{
+	char *p = os_strstr(msg, token);
+	if (!p)
+		return;
+	size_t tlen = os_strlen(token);
+	/* Remove optional leading space too */
+	if (p > msg && p[-1] == ' ') {
+		p--;
+		tlen++;
+	}
+	os_memmove(p, p + tlen, os_strlen(p + tlen) + 1);
+}
+
+static bool wifimon_rewrite_msg(char *msg, size_t msg_sz)
+{
+	if (!msg || msg_sz == 0)
+		return true;
+	if (!os_strstr(msg, "wifimon_status="))
+		return true;
+
+	/* Parse stage */
+	int stage = -1;
+	char *pstage = os_strstr(msg, " stage=");
+	if (pstage)
+		stage = atoi(pstage + 7);
+
+	/* Parse mac and bssid tokens (required for session routing) */
+	u8 mac[ETH_ALEN] = {0};
+	u8 bssid[ETH_ALEN] = {0};
+	bool have_mac = false;
+	bool have_bssid = false;
+
+	char *pmac = os_strstr(msg, " mac=");
+	if (pmac && wifimon_parse_mac(pmac + 5, mac) == 0)
+		have_mac = true;
+
+	char *pbssid = os_strstr(msg, " bssid=");
+	if (pbssid && wifimon_parse_mac(pbssid + 7, bssid) == 0)
+		have_bssid = true;
+
+	if (!have_mac)
+		return true;
+
+	struct wifimon_sta_state *st = wifimon_get_state(mac);
+
+	/* Replace bssid=00:.. with last known bssid for this STA */
+	if (have_bssid && wifimon_is_zero_mac(bssid)) {
+		if (st->have_bssid && !wifimon_is_zero_mac(st->bssid)) {
+			char *val = pbssid + 7;
+			os_snprintf(val, 18, MACSTR, MAC2STR(st->bssid));
+			os_memcpy(bssid, st->bssid, ETH_ALEN);
+		} else {
+			/* Do not emit wifimon with zero bssid (unkeyable). */
+			return false;
+		}
+	}
+
+	/* Update last known bssid */
+	if (have_bssid && !wifimon_is_zero_mac(bssid)) {
+		os_memcpy(st->bssid, bssid, ETH_ALEN);
+		st->have_bssid = true;
+	}
+
+	bool has_connect = os_strstr(msg, "session=connect") != NULL;
+	bool has_disconnect = os_strstr(msg, "session=disconnect") != NULL;
+	bool has_session_start = os_strstr(msg, "session_start=1") != NULL;
+	bool has_session_end = os_strstr(msg, "session_end=1") != NULL;
+
+	enum { SESS_NONE = 0, SESS_CONNECT = 1, SESS_DISCONNECT = 2 } eff = SESS_NONE;
+	if (has_connect)
+		eff = SESS_CONNECT;
+	else if (has_disconnect)
+		eff = SESS_DISCONNECT;
+	else if (st->disconnect_active && wifimon_is_disconnect_stage(stage))
+		eff = SESS_DISCONNECT;
+	else if (st->connect_active)
+		eff = SESS_CONNECT;
+	else if (st->disconnect_active)
+		eff = SESS_DISCONNECT;
+
+	/* Suppress duplicate session_start markers */
+	if (eff == SESS_CONNECT && has_session_start && st->connect_active)
+		wifimon_remove_token(msg, "session_start=1");
+	if (eff == SESS_DISCONNECT && has_session_start && st->disconnect_active)
+		wifimon_remove_token(msg, "session_start=1");
+
+	/* Apply start/end state transitions (based on message content) */
+	if (eff == SESS_CONNECT && has_session_start)
+		st->connect_active = true;
+	if (eff == SESS_DISCONNECT && has_session_start)
+		st->disconnect_active = true;
+
+	/* Attach session=... to marker-less messages while session is active */
+	if (eff == SESS_CONNECT && !has_connect && !has_disconnect) {
+		size_t cur = os_strlen(msg);
+		const char *add = " session=connect";
+		if (cur + os_strlen(add) + 1 < msg_sz) {
+			os_strlcat(msg, add, msg_sz);
+			has_connect = true;
+		}
+	}
+	if (eff == SESS_DISCONNECT && !has_connect && !has_disconnect) {
+		size_t cur = os_strlen(msg);
+		const char *add = " session=disconnect";
+		if (cur + os_strlen(add) + 1 < msg_sz) {
+			os_strlcat(msg, add, msg_sz);
+			has_disconnect = true;
+		}
+	}
+
+	/* Apply end transitions after attaching session type */
+	if (eff == SESS_CONNECT && has_session_end)
+		st->connect_active = false;
+	if (eff == SESS_DISCONNECT && has_session_end)
+		st->disconnect_active = false;
+
+	return true;
+}
+
 void wpa_msg_glo(int level, const char *fmt, ...)
 {
     if (!global_ifaces || global_ifaces->global_ctrl_sock == -1 || 
@@ -878,17 +1068,23 @@ void wpa_msg_glo(int level, const char *fmt, ...)
     // Формируем сообщение
     va_list ap;
     va_start(ap, fmt);
-    char msg[1024];
+    char msg[2048];
     int len = vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
 
     if (len < 0 || len >= sizeof(msg)) return;
 
+    if (level == MSG_WIFIMON) {
+        if (!wifimon_rewrite_msg(msg, sizeof(msg)))
+            return;
+        len = (int) os_strlen(msg);
+    }
+
     // Добавляем временную метку
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) return;
 
-    char buf[1088];
+    char buf[2176];
     int buflen = snprintf(buf, sizeof(buf), "IFNAME=GLOBAL <%d>%s ts=%ld.%09ld",
                          level, msg, (long)ts.tv_sec, ts.tv_nsec);
     if (buflen < 0 || buflen >= sizeof(buf)) return;
