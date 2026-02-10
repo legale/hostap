@@ -481,6 +481,7 @@ typedef enum wifi_stage {
 	S_REASSOC_REQ = 19,       // incoming mgmt::reassoc frame
 	S_REASSOC_RES = 20,       // outgoing mgmt::reassoc frame
 	S_ACTIVE_SESSION = 21,    // active session stage (no corresponding tx/rx event)
+	S_L3_UP = 22,             // client station ip assigned (no corresponding tx/rx event)
 } wifi_stage_t;
 
 typedef enum wifimon_status {
@@ -511,6 +512,7 @@ typedef enum wifimon_code {
 	WMC_LOC_MIC_FAILURE = 13,
 	WMC_LOC_PTK_REKEY_FAIL = 14,
 	WMC_LOC_GROUP_REKEY_FAIL = 15,
+	WMC_LOC_PSK_MISMATCH = 16,
 
 	WMC_SC_WLAN_STATUS_SUCCESS = (int)(WMC_T_SC + WLAN_STATUS_SUCCESS),
 	WMC_SC_WLAN_STATUS_UNSPECIFIED_FAILURE = (int)(WMC_T_SC + WLAN_STATUS_UNSPECIFIED_FAILURE),
@@ -600,25 +602,40 @@ typedef enum wifimon_code {
 /* helper: choose wifimon_code from sc/rc while still allowing local override */
 static inline wifimon_code_t wifimon_code_from_status(int sc)
 {
-	return (wifimon_code_t)(1000 + sc);
+	return (wifimon_code_t)(WMC_T_SC + (unsigned int)sc);
 }
 
 static inline wifimon_code_t wifimon_code_from_reason(int rc)
 {
-	return (wifimon_code_t)(2000 + rc);
+	return (wifimon_code_t)(WMC_T_RC + (unsigned int)rc);
 }
 
 void wpa_msg_glo(int level, const char *fmt, ...);
 void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bssid);
 
-// Макрос для сообщений wifimon с разным статусом
-#define WIFIMON_MSG(wifimon_status, stage, fmt, ...) \
-	wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: wifimon_status=%d stage=%d " fmt, __FILENAME__, __LINE__, __FUNCTION__, wifimon_status, stage, ##__VA_ARGS__)
+/*
+ * WIFIMON logging macros.
+ * Every message contains mandatory tokens:
+ *   wifimon_status=N stage=N code=N sc=N rc=N [free text]
+ * key=value separated by spaces, no spaces around '='.
+ *
+ * Parameters:
+ *   wifimon_status - WIFIMON_OK/INF/ERR/WARN
+ *   stage          - wifi_stage_t value
+ *   code           - wifimon_code_t (WMC_OK, WMC_LOC_*, WMC_T_SC+sc, WMC_T_RC+rc)
+ *   sc             - raw IEEE 802.11 status_code  (0 if not applicable)
+ *   rc             - raw IEEE 802.11 reason_code   (0 if not applicable)
+ *   fmt, ...       - free-form text (key=value style recommended)
+ */
+#define WIFIMON_MSG(wifimon_status, stage, code, sc, rc, fmt, ...) \
+	wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: wifimon_status=%d stage=%d code=%d sc=%d rc=%d " fmt, \
+		__FILENAME__, __LINE__, __FUNCTION__, \
+		(int)(wifimon_status), (int)(stage), (int)(code), (int)(sc), (int)(rc), ##__VA_ARGS__)
 
-#define WIFIMON_OK(stage, fmt, ...) WIFIMON_MSG(WIFIMON_OK, stage, fmt, ##__VA_ARGS__)
-#define WIFIMON_INF(stage, fmt, ...) WIFIMON_MSG(WIFIMON_INF, stage, fmt, ##__VA_ARGS__)
-#define WIFIMON_ERR(stage, fmt, ...) WIFIMON_MSG(WIFIMON_ERR, stage, fmt, ##__VA_ARGS__)
-#define WIFIMON_WARN(stage, fmt, ...) WIFIMON_MSG(WIFIMON_WARN, stage, fmt, ##__VA_ARGS__)
-#define WIFIMON_DEBUG(stage, fmt, ...) WIFIMON_MSG(WIFIMON_INF, stage, fmt, ##__VA_ARGS__)
+#define WIFIMON_OK(stage, code, sc, rc, fmt, ...)   WIFIMON_MSG(WIFIMON_OK,   stage, code, sc, rc, fmt, ##__VA_ARGS__)
+#define WIFIMON_INF(stage, code, sc, rc, fmt, ...)  WIFIMON_MSG(WIFIMON_INF,  stage, code, sc, rc, fmt, ##__VA_ARGS__)
+#define WIFIMON_ERR(stage, code, sc, rc, fmt, ...)  WIFIMON_MSG(WIFIMON_ERR,  stage, code, sc, rc, fmt, ##__VA_ARGS__)
+#define WIFIMON_WARN(stage, code, sc, rc, fmt, ...) WIFIMON_MSG(WIFIMON_WARN, stage, code, sc, rc, fmt, ##__VA_ARGS__)
+#define WIFIMON_DEBUG(stage, code, sc, rc, fmt, ...) WIFIMON_MSG(WIFIMON_INF, stage, code, sc, rc, fmt, ##__VA_ARGS__)
 
 #endif /* WPA_DEBUG_H */

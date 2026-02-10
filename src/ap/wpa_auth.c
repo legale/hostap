@@ -261,9 +261,9 @@ static inline void wpa_auth_set_eapol(struct wpa_authenticator *wpa_auth,
 				      int value)
 {
 	if (wpa_auth->cb->set_eapol){
-		WIFIMON_INF(S_HANDSHAKE, "wpa_auth_set_eapol var=%d val=%d mac=" MACSTR " bssid=" MACSTR, var, value, MAC2STR(addr), MAC2STR(wpa_auth->hapd ? wpa_auth->hapd->own_addr : zeromac));
+		WIFIMON_INF(S_HANDSHAKE, WMC_OK, 0, 0, "wpa_auth_set_eapol var=%d val=%d mac=" MACSTR " bssid=" MACSTR, var, value, MAC2STR(addr), MAC2STR(wpa_auth->hapd ? wpa_auth->hapd->own_addr : zeromac));
 		if(var == WPA_EAPOL_authorized && value != 0){
-			WIFIMON_OK(S_HANDSHAKE_DONE, "wpa_auth_set_eapol handshake done var=%d val=%d done mac=" MACSTR " bssid=" MACSTR, var, value, MAC2STR(addr), MAC2STR(wpa_auth->hapd ? wpa_auth->hapd->own_addr : zeromac));
+			WIFIMON_OK(S_HANDSHAKE_DONE, WMC_OK, 0, 0, "wpa_auth_set_eapol handshake_done var=%d val=%d mac=" MACSTR " bssid=" MACSTR, var, value, MAC2STR(addr), MAC2STR(wpa_auth->hapd ? wpa_auth->hapd->own_addr : zeromac));
 		}
 		wpa_auth->cb->set_eapol(wpa_auth->cb_ctx, addr, var, value);
 	}
@@ -2129,13 +2129,11 @@ void __wpa_send_eapol(struct wpa_authenticator *wpa_auth,
 		version = WPA_KEY_INFO_TYPE_HMAC_MD5_RC4;
 
 	pairwise = !!(key_info & WPA_KEY_INFO_KEY_TYPE);
-	WIFIMON_INF(
-		S_HANDSHAKE,
-		"send eapol version=%d mac=" MACSTR " bssid=" MACSTR,
+	WIFIMON_INF(S_HANDSHAKE, WMC_OK, 0, 0,
+		"send_eapol version=%d mac=" MACSTR " bssid=" MACSTR,
 		version,
 		MAC2STR(sm->addr),
-		MAC2STR(sm->hapd ? sm->hapd->own_addr : zeromac)
-	);
+		MAC2STR(sm->hapd ? sm->hapd->own_addr : zeromac));
 	wpa_printf(MSG_DEBUG,
 		   "WPA: Send EAPOL(version=%d secure=%d mic=%d ack=%d install=%d pairwise=%d kde_len=%zu keyidx=%d encr=%d)",
 		   version,
@@ -5489,7 +5487,7 @@ SM_STATE(WPA_PTK, PTKINITDONE)
 			 sm->wpa == WPA_VERSION_WPA ? "WPA" : "RSN");
 	wpa_msg(sm->wpa_auth->conf.msg_ctx, MSG_INFO, "EAPOL-4WAY-HS-COMPLETED "
 		MACSTR, MAC2STR(sm->addr));
-	WIFIMON_OK(S_HANDSHAKE_DONE, "pairwise key handshake completed wpa_version=%d mac=" MACSTR " bssid=" MACSTR, sm->wpa, MAC2STR(sm->addr), MAC2STR(sm->hapd ? sm->hapd->own_addr : zeromac));
+	WIFIMON_OK(S_HANDSHAKE_DONE, WMC_OK, 0, 0, "pairwise_key_handshake_completed wpa_version=%d mac=" MACSTR " bssid=" MACSTR, sm->wpa, MAC2STR(sm->addr), MAC2STR(sm->hapd ? sm->hapd->own_addr : zeromac));
 
 
 #ifdef CONFIG_IEEE80211R_AP
