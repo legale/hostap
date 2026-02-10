@@ -460,4 +460,6 @@ int str_to_debug_level(const char *s);
 
 #include "wifimon_defs.h"
 
+void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bssid);
+
 #endif /* WPA_DEBUG_H */
