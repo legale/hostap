@@ -1885,6 +1885,10 @@ void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 
 		WIFIMON_OK(S_ACTIVE_SESSION, WMC_OK, 0, 0, "active_session session=connect session_end=1 mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	} else {
+		WIFIMON_OK(S_ACTIVE_SESSION, WMC_OK, 0, 0,
+			   "active_session session=disconnect session_end=1 mac=" MACSTR
+			   " bssid=" MACSTR,
+			   MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_DISCONNECTED "%s", buf);
 		hostapd_ubus_notify(hapd, "disassoc", sta->addr);
 
