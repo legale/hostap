@@ -8934,6 +8934,7 @@ repeat_rnr:
 
 	total_tbtt_count += tbtt_count;
 
+	#ifdef CONFIG_IEEE80211BE
 	/* If building for co-location, re-build again but this time include
 	 * ML TBTTs if the reporting AP is affiliated with an AP MLD.
 	 */
@@ -8942,6 +8943,7 @@ repeat_rnr:
 		tbtt_info_len = RNR_TBTT_INFO_MLD_LEN;
 		goto repeat_rnr;
 	}
+	#endif /* CONFIG_IEEE80211BE */
 
 	if (!total_tbtt_count)
 		return eid_start;
