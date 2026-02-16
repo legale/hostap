@@ -8444,9 +8444,11 @@ static bool hostapd_skip_rnr(size_t i, struct mbssid_ie_profiles *skip_profiles,
 	/* No need to report if length is for normal TBTT and both the reporting
 	 * AP and neighbor AP are affiliated with an AP MLD. MLD TBTT will
 	 * include this. */
+#ifdef CONFIG_IEEE80211BE
 	if (tbtt_info_len == RNR_TBTT_INFO_LEN && ap_mld &&
 	    reporting_hapd->conf->mld_ap)
 		return true;
+#endif /* CONFIG_IEEE80211BE */
 
 	/* No need to report if length is for MLD TBTT and the BSS is not
 	 * affiliated with an aP MLD. Normal TBTT will include this. */
@@ -8546,6 +8548,7 @@ repeat_rnr_len:
 	/* If building for co-location, re-build again but this time include
 	 * ML TBTTs if the reporting AP is affiliated with an AP MLD.
 	 */
+#ifdef CONFIG_IEEE80211BE
 	if (!mld_update && tbtt_info_len == RNR_TBTT_INFO_LEN &&
 	    reporting_hapd->conf->mld_ap) {
 		tbtt_info_len = RNR_TBTT_INFO_MLD_LEN;
@@ -8560,6 +8563,7 @@ repeat_rnr_len:
 
 		goto repeat_rnr_len;
 	}
+#endif /* CONFIG_IEEE80211BE */
 
 	/* This is possible when in the re-built case and no suitable TBTT was
 	 * found. Adjust the length accordingly. */

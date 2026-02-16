@@ -3232,7 +3232,7 @@ static int wpa_ft_local_derive_pmk_r1(struct wpa_authenticator *wpa_auth,
 
 
 static void wpa_ft_auth_req_hist_expire(struct wpa_state_machine *sm,
-					const struct os_reltime *now)
+					struct os_reltime *now)
 {
 	unsigned int i;
 
@@ -3251,7 +3251,7 @@ static void wpa_ft_auth_req_hist_expire(struct wpa_state_machine *sm,
 static struct wpa_ft_auth_req_entry *
 wpa_ft_auth_req_hist_find(struct wpa_state_machine *sm, const u8 *snonce,
 			  const u8 *anonce, const u8 *pmk_r1_name,
-			  const struct os_reltime *now)
+			  struct os_reltime *now)
 {
 	unsigned int i;
 
