@@ -463,7 +463,7 @@ static void hostapd_wpa_auth_disconnect(void *ctx, const u8 *addr,
 					u16 reason)
 {
 	struct hostapd_data *hapd = ctx;
-	WIFIMON_ERR(S_HANDSHAKE, WMC_LOC_LOCAL_DEAUTH_REQ, 0, reason, "authenticator_requests_disconnect mac=" MACSTR " bssid=" MACSTR " reason=%d", MAC2STR(addr), MAC2STR(hapd->own_addr), reason);
+	WIFIMON_ERR(ap_get_sta(hapd, addr), S_HANDSHAKE, WMC_LOC_LOCAL_DEAUTH_REQ, 0, reason, "authenticator_requests_disconnect mac=" MACSTR " bssid=" MACSTR " reason=%d", MAC2STR(addr), MAC2STR(hapd->own_addr), reason);
 	
 	wpa_printf(MSG_DEBUG, "%s: WPA authenticator requests disconnect: "
 		   "STA " MACSTR " reason %d",
@@ -475,7 +475,7 @@ static void hostapd_wpa_auth_disconnect(void *ctx, const u8 *addr,
 static int hostapd_wpa_auth_mic_failure_report(void *ctx, const u8 *addr)
 {
 	struct hostapd_data *hapd = ctx;
-	WIFIMON_ERR(S_HANDSHAKE, WMC_LOC_MIC_FAILURE, 0, 0, "message_integrity_check_failed mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
+	WIFIMON_ERR(ap_get_sta(hapd, addr), S_HANDSHAKE, WMC_LOC_MIC_FAILURE, 0, 0, "message_integrity_check_failed mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
 
 	return michael_mic_failure(hapd, addr, 0);
 }
@@ -484,7 +484,7 @@ static int hostapd_wpa_auth_mic_failure_report(void *ctx, const u8 *addr)
 static void hostapd_wpa_auth_psk_failure_report(void *ctx, const u8 *addr)
 {
 	struct hostapd_data *hapd = ctx;
-	WIFIMON_ERR(S_HANDSHAKE, WMC_LOC_PSK_MISMATCH, 0, 0, "possible_psk_mismatch mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
+	WIFIMON_ERR(ap_get_sta(hapd, addr), S_HANDSHAKE, WMC_LOC_PSK_MISMATCH, 0, 0, "possible_psk_mismatch mac=" MACSTR " bssid=" MACSTR, MAC2STR(addr), MAC2STR(hapd->own_addr));
 
 	wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_POSSIBLE_PSK_MISMATCH MACSTR,
 		MAC2STR(addr));

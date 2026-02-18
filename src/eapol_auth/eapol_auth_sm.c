@@ -19,6 +19,7 @@
 #include "eapol_auth_sm_i.h"
 
 #include "ap/hostapd.h"
+#include "ap/sta_info.h"
 
 #define STATE_MACHINE_DATA struct eapol_state_machine
 #define STATE_MACHINE_DEBUG_PREFIX "IEEE 802.1X"
@@ -971,7 +972,7 @@ restart:
 					   "but no aaaEapRespData available");
 				return;
 			}
-			WIFIMON_DEBUG(S_UNK, WMC_OK, 0, 0, "fn=%s", __func__);
+			WIFIMON_DEBUG((struct sta_info *)sm->sta, S_UNK, WMC_OK, 0, 0, "fn=%s", __func__);
 			sm->eapol->cb.aaa_send(
 				sm->eapol->conf.ctx, sm->sta,
 				wpabuf_head(sm->eap_if->aaaEapRespData),

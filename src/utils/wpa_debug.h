@@ -106,7 +106,8 @@ extern int wpa_debug_show_keys;
  */
 void wpa_debug_print_timestamp(void);
 
-void wpa_msg_glo(int level, const char *fmt, ...);
+struct sta_info;
+void wpa_msg_glo(struct sta_info *sta, int level, const char *fmt, ...);
 
 /**
  * wpa_printf - conditional printf
@@ -460,6 +461,6 @@ int str_to_debug_level(const char *s);
 
 #include "wifimon_defs.h"
 
-void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bssid);
+void debug_print_rsn_ie(struct sta_info *sta, const u8 *pos, size_t left, const u8 *mac, const u8 *bssid);
 
 #endif /* WPA_DEBUG_H */

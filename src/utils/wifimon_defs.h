@@ -200,12 +200,14 @@ static inline wifimon_code_t wifimon_code_from_reason(int rc)
 /*  forward declarations used by macros                                */
 /* ------------------------------------------------------------------ */
 
-void wpa_msg_glo(int level, const char *fmt, ...);
+struct sta_info;
+void wpa_msg_glo(struct sta_info *sta, int level, const char *fmt, ...);
 
 /* ------------------------------------------------------------------ */
 /*  WIFIMON_* logging macros                                           */
 /*                                                                     */
 /*  Parameters:                                                        */
+/*    sta            - struct sta_info *sta                            */
 /*    wifimon_status - WIFIMON_OK / WIFIMON_INF / WIFIMON_ERR / WARN   */
 /*    stage          - wifi_stage_t value                               */
 /*    code           - wifimon_code_t (WMC_OK, WMC_LOC_*, or           */
@@ -215,15 +217,15 @@ void wpa_msg_glo(int level, const char *fmt, ...);
 /*    fmt, ...       - free-form text (key=value style recommended)    */
 /* ------------------------------------------------------------------ */
 
-#define WIFIMON_MSG(wifimon_status, stage, code, sc, rc, fmt, ...) \
-	wpa_msg_glo(MSG_WIFIMON, "%s:%d: %s: wifimon_status=%d stage=%d code=%d sc=%d rc=%d " fmt, \
+#define WIFIMON_MSG(sta, wifimon_status, stage, code, sc, rc, fmt, ...) \
+	wpa_msg_glo(sta, MSG_WIFIMON, "%s:%d: %s: wifimon_status=%d stage=%d code=%d sc=%d rc=%d " fmt, \
 		__FILENAME__, __LINE__, __FUNCTION__, \
 		(int)(wifimon_status), (int)(stage), (int)(code), (int)(sc), (int)(rc), ##__VA_ARGS__)
 
-#define WIFIMON_OK(stage, code, sc, rc, fmt, ...)   WIFIMON_MSG(WIFIMON_OK,   stage, code, sc, rc, fmt, ##__VA_ARGS__)
-#define WIFIMON_INF(stage, code, sc, rc, fmt, ...)  WIFIMON_MSG(WIFIMON_INF,  stage, code, sc, rc, fmt, ##__VA_ARGS__)
-#define WIFIMON_ERR(stage, code, sc, rc, fmt, ...)  WIFIMON_MSG(WIFIMON_ERR,  stage, code, sc, rc, fmt, ##__VA_ARGS__)
-#define WIFIMON_WARN(stage, code, sc, rc, fmt, ...) WIFIMON_MSG(WIFIMON_WARN, stage, code, sc, rc, fmt, ##__VA_ARGS__)
-#define WIFIMON_DEBUG(stage, code, sc, rc, fmt, ...) WIFIMON_MSG(WIFIMON_INF, stage, code, sc, rc, fmt, ##__VA_ARGS__)
+#define WIFIMON_OK(sta, stage, code, sc, rc, fmt, ...)   WIFIMON_MSG(sta, WIFIMON_OK,   stage, code, sc, rc, fmt, ##__VA_ARGS__)
+#define WIFIMON_INF(sta, stage, code, sc, rc, fmt, ...)  WIFIMON_MSG(sta, WIFIMON_INF,  stage, code, sc, rc, fmt, ##__VA_ARGS__)
+#define WIFIMON_ERR(sta, stage, code, sc, rc, fmt, ...)  WIFIMON_MSG(sta, WIFIMON_ERR,  stage, code, sc, rc, fmt, ##__VA_ARGS__)
+#define WIFIMON_WARN(sta, stage, code, sc, rc, fmt, ...) WIFIMON_MSG(sta, WIFIMON_WARN, stage, code, sc, rc, fmt, ##__VA_ARGS__)
+#define WIFIMON_DEBUG(sta, stage, code, sc, rc, fmt, ...) WIFIMON_MSG(sta, WIFIMON_INF, stage, code, sc, rc, fmt, ##__VA_ARGS__)
 
 #endif /* WIFIMON_H */
