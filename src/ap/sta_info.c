@@ -41,6 +41,23 @@
 #include "wps_hostapd.h"
 
 static u64 next_session_id = 0;
+static bool session_id_initialized = false;
+
+
+static void sta_session_id_init(void){
+	struct timespec ts;
+
+	if (session_id_initialized){
+		return;
+	}
+
+	if (clock_gettime(CLOCK_REALTIME, &ts) == 0){
+		next_session_id = (u64)ts.tv_sec;
+	}else{
+		next_session_id = rand();
+	}
+	session_id_initialized = true;
+}
 
 static void ap_sta_remove_in_other_bss(struct hostapd_data *hapd,
 				       struct sta_info *sta);
@@ -929,7 +946,8 @@ struct sta_info * ap_sta_add(struct hostapd_data *hapd, const u8 *addr)
 		wpa_printf(MSG_ERROR, "malloc failed");
 		return NULL;
 	}
-	//increment session id
+
+	sta_session_id_init();
 	sta->session_id = ++next_session_id;
 	sta->acct_interim_interval = hapd->conf->acct_interim_interval;
 	if (accounting_sta_get_id(hapd, sta) < 0) {
