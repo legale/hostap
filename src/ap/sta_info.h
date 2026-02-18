@@ -84,6 +84,7 @@ struct mld_info {
 struct sta_info {
 	struct sta_info *next; /* next entry in sta list */
 	struct sta_info *hnext; /* next entry in hash table list */
+	u64 session_id; //sta session id
 	u8 addr[6];
 	be32 ipaddr;
 	struct dl_list ip6addr; /* list head for struct ip6addr */

@@ -866,9 +866,10 @@ void hostapd_logger(void *ctx, const u8 *addr, unsigned int module, int level,
 }
 #endif /* CONFIG_NO_HOSTAPD_LOGGER */
 
+#include "../ap/sta_info.h"
 struct hapd_interfaces *global_ifaces = NULL;
 
-void wpa_msg_glo(int level, const char *fmt, ...)
+void wpa_msg_glo(struct sta_info *sta, int level, const char *fmt, ...)
 {
     if (!global_ifaces || global_ifaces->global_ctrl_sock == -1 || 
         dl_list_empty(&global_ifaces->global_ctrl_dst)) {
@@ -889,8 +890,8 @@ void wpa_msg_glo(int level, const char *fmt, ...)
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) return;
 
     char buf[1088];
-    int buflen = snprintf(buf, sizeof(buf), "IFNAME=GLOBAL <%d>%s ts=%ld.%09ld",
-                         level, msg, (long)ts.tv_sec, ts.tv_nsec);
+    int buflen = snprintf(buf, sizeof(buf), "IFNAME=GLOBAL <%d>%s session_id=%llu ts=%ld.%09ld",
+                         level, msg, (unsigned long long)(sta ? sta->session_id : 0), (long)ts.tv_sec, ts.tv_nsec);
     if (buflen < 0 || buflen >= sizeof(buf)) return;
 
     // Подготовка сообщения
@@ -968,7 +969,7 @@ int str_to_debug_level(const char *s)
  * @left: Размер оставшейся части буфера
  * @sta_addr: MAC-адрес станции (для логирования)
  */
-void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bssid)
+void debug_print_rsn_ie(struct sta_info *sta, const u8 *pos, size_t left, const u8 *mac, const u8 *bssid)
 {
     const u8 *rsn_ie = NULL;
     size_t rsn_ie_len = 0;
@@ -980,14 +981,14 @@ void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bss
     
     rsn_ie = get_ie(pos, left, WLAN_EID_RSN);
     if (!rsn_ie || rsn_ie[1] == 0) {
-        WIFIMON_DEBUG(S_AUTH_HANDLE, WMC_OK, 0, 0, "RSN_IE_not_found mac=" MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
+        WIFIMON_DEBUG(sta, S_AUTH_HANDLE, WMC_OK, 0, 0, "RSN_IE_not_found mac=" MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
         return;
     }
     
     rsn_ie_len = rsn_ie[1] + 2;
     
     if (wpa_parse_wpa_ie_rsn(rsn_ie, rsn_ie_len, &rsn_data) != 0) {
-        WIFIMON_DEBUG(S_AUTH_HANDLE, WMC_OK, 0, 0, "RSN_IE_parse_failed mac=" MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
+        WIFIMON_DEBUG(sta, S_AUTH_HANDLE, WMC_OK, 0, 0, "RSN_IE_parse_failed mac=" MACSTR " bssid=" MACSTR, MAC2STR(mac), MAC2STR(bssid));
         return;
     }
     
@@ -1267,7 +1268,7 @@ void debug_print_rsn_ie(const u8 *pos, size_t left, const u8 *mac, const u8 *bss
     }
     mgmt_group_name[sizeof(mgmt_group_name) - 1] = '\0';
 
-	WIFIMON_DEBUG(S_AUTH_HANDLE, WMC_OK, 0, 0,
+	WIFIMON_DEBUG(sta, S_AUTH_HANDLE, WMC_OK, 0, 0,
 					"mac=" MACSTR " bssid=" MACSTR
 					" group_cipher=%d group_name=%s"
 					" pairwise_cipher=%d pairwise_name=%s"

@@ -15,6 +15,7 @@
 #include "crypto/tls.h"
 #include "radius.h"
 #include "radius_client.h"
+#include "../ap/sta_info.h"
 #include "ap/hostapd.h"
 
 static u8 zeromac[ETH_ALEN] = {0};
@@ -903,7 +904,7 @@ int radius_client_send(struct radius_client_data *radius,
 			radius_code = hdr->code;
 		}
 
-		WIFIMON_MSG(WIFIMON_OK, stage, WMC_OK, 0, 0, "radius_send radius_server=%s radius_code=%d radius_type=%d mac=" MACSTR " bssid=" MACSTR, abuf, radius_code, msg_type, MAC2STR(addr), MAC2STR(bssid));
+		WIFIMON_MSG(ap_get_sta(radius->ctx, addr), WIFIMON_OK, stage, WMC_OK, 0, 0, "radius_send radius_server=%s radius_code=%d radius_type=%d mac=" MACSTR " bssid=" MACSTR, abuf, radius_code, msg_type, MAC2STR(addr), MAC2STR(bssid));
 	}
 
 
@@ -1378,7 +1379,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 	} else if (msg_type == RADIUS_ACCT || msg_type == RADIUS_ACCT_INTERIM){
 		stage = S_RADIUS_ACCT_RES;
 	}
-	WIFIMON_MSG(wifimon_status,
+	WIFIMON_MSG(ap_get_sta(radius->ctx, req->addr), wifimon_status,
 		stage, WMC_OK, 0, 0,
 		"radius_recv radius_type=%d id=%d sa_family=%d"
 		" mac=" MACSTR " bssid=" MACSTR
@@ -1405,7 +1406,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 
 	int ret = radius_msg_get_attr_ptr(req->msg, RADIUS_ATTR_CALLING_STATION_ID,
 								&attr_val_ptr, &len_attr, NULL);
-	WIFIMON_INF(stage, WMC_OK, 0, 0, "radius_msg_get_attr_ptr attr=31 len=%zu", len_attr);
+	WIFIMON_INF(ap_get_sta(radius->ctx, req->addr), stage, WMC_OK, 0, 0, "radius_msg_get_attr_ptr attr=31 len=%zu", len_attr);
 
 	if (ret == 0) {
 		/* Parse string as 802.1X MAC address format and store mac bytes */
@@ -1417,11 +1418,11 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 		buf_macstr[copy_len] = '\0';
 
 		if (hwaddr_aton2((const char *) buf_macstr, buf_mac) < 0) {
-			WIFIMON_ERR(stage, WMC_LOC_UNK, 0, 0,
+			WIFIMON_ERR(ap_get_sta(radius->ctx, req->addr), stage, WMC_LOC_UNK, 0, 0,
 				    "unable_to_parse_attr_as_mac");
 
 			if (len_attr >= sizeof(buf_macstr)) {
-				WIFIMON_ERR(stage, WMC_LOC_UNK, 0, 0,
+				WIFIMON_ERR(ap_get_sta(radius->ctx, req->addr), stage, WMC_LOC_UNK, 0, 0,
 					    "attr_len_overflow len=%zu max=%zu",
 					    len_attr, sizeof(buf_macstr) - 1);
 			}
@@ -1431,7 +1432,7 @@ static void radius_client_receive(int sock, void *eloop_ctx, void *sock_ctx)
 		}
 		// radius_msg_dump(req->msg);
 	}
-	WIFIMON_INF(stage, WMC_OK, 0, 0,
+	WIFIMON_INF(ap_get_sta(radius->ctx, req->addr), stage, WMC_OK, 0, 0,
 			 "radius_type=%d reply_code=%u req_addr=" MACSTR
 			 " len=%zu val=%s mac=" MACSTR,
 			 msg_type, hdr->code, MAC2STR(req->addr), len_attr,
