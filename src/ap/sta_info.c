@@ -2141,3 +2141,22 @@ void ap_sta_free_sta_profile(struct mld_info *info)
 	}
 }
 #endif /* CONFIG_IEEE80211BE */
+
+
+bool ap_sta_is_mld(struct hostapd_data *hapd, struct sta_info *sta)
+{
+#ifdef CONFIG_IEEE80211BE
+	return hapd->conf->mld_ap && sta && sta->mld_info.mld_sta;
+#else /* CONFIG_IEEE80211BE */
+	return false;
+#endif /* CONFIG_IEEE80211BE */
+}
+
+
+void ap_sta_set_mld(struct sta_info *sta, bool mld)
+{
+#ifdef CONFIG_IEEE80211BE
+	if (sta)
+		sta->mld_info.mld_sta = mld;
+#endif /* CONFIG_IEEE80211BE */
+}

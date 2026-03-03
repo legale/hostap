@@ -61,6 +61,7 @@ void apup_process_beacon(struct hostapd_data *hapd,
 	const u8 *mld_link_addr = NULL;
 	bool mld_link_sta = false;
 	u16 eml_cap = 0;
+	bool epp_sta = false;
 
 	/* First add the station without more information */
 	int aRet = hostapd_sta_add(
@@ -68,7 +69,7 @@ void apup_process_beacon(struct hostapd_data *hapd,
 	            NULL, 0, 0, NULL, NULL, NULL, 0, NULL, 0, NULL,
 	            sta_ret->flags, 0, 0, 0,
 	            0, // 0 add, 1 set
-	            mld_link_addr, mld_link_sta, eml_cap);
+	            mld_link_addr, mld_link_sta, eml_cap, epp_sta);
 
 	sta_ret->flags |= WLAN_STA_AUTH;
 	wpa_auth_sm_event(sta_ret->wpa_sm, WPA_AUTH);
@@ -142,7 +143,7 @@ void apup_process_beacon(struct hostapd_data *hapd,
 	            sta_ret->vht_opmode,
 	            0, // int supp_p2p_ps
 	            1, // 0 add, 1 set
-	            mld_link_addr, mld_link_sta, eml_cap);
+	            mld_link_addr, mld_link_sta, eml_cap, epp_sta);
 
 	ap_sta_set_authorized(hapd, sta_ret, 1);
 	hostapd_set_sta_flags(hapd, sta_ret);
