@@ -40,25 +40,6 @@
 #include "vlan.h"
 #include "wps_hostapd.h"
 
-static u64 next_session_id = 0;
-static bool session_id_initialized = false;
-
-
-static void sta_session_id_init(void){
-	struct timespec ts;
-
-	if (session_id_initialized){
-		return;
-	}
-
-	if (clock_gettime(CLOCK_REALTIME, &ts) == 0){
-		next_session_id = (u64)ts.tv_sec;
-	}else{
-		next_session_id = rand();
-	}
-	session_id_initialized = true;
-}
-
 static void ap_sta_remove_in_other_bss(struct hostapd_data *hapd,
 				       struct sta_info *sta);
 static void ap_handle_session_timer(void *eloop_ctx, void *timeout_ctx);
@@ -287,15 +268,6 @@ void clear_wpa_sm_for_all_sta(struct hostapd_data *hapd,
 
 #endif /* CONFIG_IEEE80211BE */
 
-#ifndef CONFIG_IEEE80211BE
-void clear_wpa_sm_for_all_sta(struct hostapd_data *hapd,
-			      struct wpa_state_machine *wpa_sm)
-{
-	(void) hapd;
-	(void) wpa_sm;
-}
-#endif /* !CONFIG_IEEE80211BE */
-
 
 void ap_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 {
@@ -307,8 +279,6 @@ void ap_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 	accounting_sta_stop(hapd, sta);
 
 	/* just in case */
-	/* This is the last reliable point to close disconnect session for this STA. */
-	if(sta) WIFIMON_INF(sta, S_DEAUTHORIZED, WMC_OK, 0, 0, "ap_free_sta deauthorize session=disconnect session_end=1 mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	ap_sta_set_authorized(hapd, sta, 0);
 	hostapd_set_sta_flags(hapd, sta);
 
@@ -565,11 +535,6 @@ void ap_free_sta(struct hostapd_data *hapd, struct sta_info *sta)
 
 	wpabuf_free(sta->sae_pw_id);
 
-#ifdef CONFIG_SAE
-	if (sta->sae_pt)
-		sae_deinit_pt(sta->sae_pt);
-#endif
-
 	os_free(sta);
 }
 
@@ -638,7 +603,6 @@ void ap_handle_timer(void *eloop_ctx, void *timeout_ctx)
 		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE80211,
 			       HOSTAPD_LEVEL_INFO, "deauthenticated due to "
 			       "local deauth request");
-		hostapd_ubus_notify(hapd, "local-deauth", sta->addr);
 		ap_free_sta(hapd, sta);
 		return;
 	}
@@ -750,7 +714,6 @@ skip_poll:
 			MAC2STR(sta->addr));
 
 		if (deauth) {
-			WIFIMON_INF(sta, S_DEAUTH_RES, WMC_LOC_INACTIVITY_DEAUTH, 0, WLAN_REASON_PREV_AUTH_NOT_VALID, "ap_handle_timer tx_inactivity_deauth session=disconnect session_start=1 mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 			hostapd_drv_sta_deauth(
 				hapd, sta->addr,
 				WLAN_REASON_PREV_AUTH_NOT_VALID);
@@ -758,7 +721,7 @@ skip_poll:
 			reason = (sta->timeout_next == STA_DISASSOC) ?
 				WLAN_REASON_DISASSOC_DUE_TO_INACTIVITY :
 				WLAN_REASON_PREV_AUTH_NOT_VALID;
-			WIFIMON_INF(sta, S_DISASSOC_RES, WMC_LOC_INACTIVITY_DISASSOC, 0, reason, "ap_handle_timer tx_inactivity_disassoc session=disconnect session_start=1 mac=" MACSTR " bssid=" MACSTR " reason=%d", MAC2STR(sta->addr), MAC2STR(hapd->own_addr), reason);
+
 			hostapd_drv_sta_disassoc(hapd, sta->addr, reason);
 		}
 	}
@@ -774,7 +737,6 @@ skip_poll:
 		break;
 	case STA_DISASSOC:
 	case STA_DISASSOC_FROM_CLI:
-		if(sta) WIFIMON_INF(sta, S_DEAUTHORIZED, WMC_LOC_INACTIVITY_DISASSOC, 0, 0, "ap_handle_timer disassoc_timeout session=disconnect session_start=1 mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		ap_sta_set_authorized(hapd, sta, 0);
 		sta->flags &= ~WLAN_STA_ASSOC;
 		hostapd_set_sta_flags(hapd, sta);
@@ -800,7 +762,6 @@ skip_poll:
 		break;
 	case STA_DEAUTH:
 	case STA_REMOVE:
-		WIFIMON_INF(sta, S_DEAUTHORIZED, WMC_LOC_INACTIVITY_DEAUTH, 0, WLAN_REASON_PREV_AUTH_NOT_VALID, "ap_handle_timer inactivity_deauth session=disconnect session_start=1 mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE80211,
 			       HOSTAPD_LEVEL_INFO, "deauthenticated due to "
 			       "inactivity (timer DEAUTH/REMOVE)");
@@ -810,7 +771,6 @@ skip_poll:
 		mlme_deauthenticate_indication(
 			hapd, sta,
 			WLAN_REASON_PREV_AUTH_NOT_VALID);
-		hostapd_ubus_notify(hapd, "inactive-deauth", sta->addr);
 		ap_free_sta(hapd, sta);
 		break;
 	}
@@ -834,7 +794,6 @@ static void ap_handle_session_timer(void *eloop_ctx, void *timeout_ctx)
 		return;
 	}
 
-	WIFIMON_INF(sta, S_DEAUTHORIZED, WMC_LOC_INACTIVITY_DEAUTH, 0, WLAN_REASON_PREV_AUTH_NOT_VALID, "session_timeout_deauth session=disconnect session_start=1 mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	hostapd_drv_sta_deauth(hapd, sta->addr,
 			       WLAN_REASON_PREV_AUTH_NOT_VALID);
 	mlme_deauthenticate_indication(hapd, sta,
@@ -946,9 +905,6 @@ struct sta_info * ap_sta_add(struct hostapd_data *hapd, const u8 *addr)
 		wpa_printf(MSG_ERROR, "malloc failed");
 		return NULL;
 	}
-
-	sta_session_id_init();
-	sta->session_id = ++next_session_id;
 	sta->acct_interim_interval = hapd->conf->acct_interim_interval;
 	if (accounting_sta_get_id(hapd, sta) < 0) {
 		os_free(sta);
@@ -1276,7 +1232,6 @@ static bool ap_sta_ml_disconnect(struct hostapd_data *hapd,
 void ap_sta_disassociate(struct hostapd_data *hapd, struct sta_info *sta,
 			 u16 reason)
 {
-	WIFIMON_INF(sta, S_DISASSOC_RES, wifimon_code_from_reason(reason), 0, reason, "ap_sta_disassociate session=disconnect session_start=1 mac=" MACSTR " bssid=" MACSTR " reason=%d", MAC2STR(sta->addr), MAC2STR(hapd->own_addr), reason);
 	if (ap_sta_ml_disconnect(hapd, sta, reason, AP_STA_DISASSOCIATE))
 		return;
 
@@ -1287,7 +1242,6 @@ void ap_sta_disassociate(struct hostapd_data *hapd, struct sta_info *sta,
 void ap_sta_deauthenticate(struct hostapd_data *hapd, struct sta_info *sta,
 			   u16 reason)
 {
-	WIFIMON_INF(sta, S_DEAUTH_RES, wifimon_code_from_reason(reason), 0, reason, "ap_sta_deauthenticate session=disconnect session_start=1 mac=" MACSTR " bssid=" MACSTR " reason=%d", MAC2STR(sta->addr), MAC2STR(hapd->own_addr), reason);
 	if (hapd->iface->current_mode &&
 	    hapd->iface->current_mode->mode == HOSTAPD_MODE_IEEE80211AD) {
 		/* Deauthentication is not used in DMG/IEEE 802.11ad;
@@ -1782,6 +1736,9 @@ bool ap_sta_set_authorized_flag(struct hostapd_data *hapd, struct sta_info *sta,
 				mld_assoc_link_id = -2;
 		}
 #endif /* CONFIG_IEEE80211BE */
+		if (mld_assoc_link_id != -2)
+			hostapd_prune_associations(hapd, sta->addr,
+						   mld_assoc_link_id);
 		sta->flags |= WLAN_STA_AUTHORIZED;
 	} else {
 		sta->flags &= ~WLAN_STA_AUTHORIZED;
@@ -1794,13 +1751,6 @@ bool ap_sta_set_authorized_flag(struct hostapd_data *hapd, struct sta_info *sta,
 void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 				 struct sta_info *sta, int authorized)
 {
-	if(authorized){
-		WIFIMON_OK(sta, S_AUTHORIZED, WMC_OK, 0, 0, "authorized=%d mac=" MACSTR " bssid=" MACSTR, authorized, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
-	} else {
-		/* Don't close disconnect session here: additional wifimon/WPA logs often follow. */
-		WIFIMON_OK(sta, S_DEAUTHORIZED, WMC_OK, 0, 0, "authorized=%d session=disconnect mac=" MACSTR " bssid=" MACSTR, authorized, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
-	}
-
 	const u8 *dev_addr = NULL;
 	char buf[100];
 #ifdef CONFIG_P2P
@@ -1809,8 +1759,6 @@ void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 #endif /* CONFIG_P2P */
 	const u8 *ip_ptr = NULL;
 
-	if (authorized)
-		hostapd_ucode_sta_connected(hapd, sta);
 #ifdef CONFIG_P2P
 	if (hapd->p2p_group == NULL) {
 		if (sta->p2p_ie != NULL &&
@@ -1827,30 +1775,17 @@ void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 		os_snprintf(buf, sizeof(buf), MACSTR, MAC2STR(sta->addr));
 
 	if (authorized) {
-		static const char * const auth_algs[] = {
-			[WLAN_AUTH_OPEN] = "open",
-			[WLAN_AUTH_SHARED_KEY] = "shared",
-			[WLAN_AUTH_FT] = "ft",
-			[WLAN_AUTH_SAE] = "sae",
-			[WLAN_AUTH_FILS_SK] = "fils-sk",
-			[WLAN_AUTH_FILS_SK_PFS] = "fils-sk-pfs",
-			[WLAN_AUTH_FILS_PK] = "fils-pk",
-			[WLAN_AUTH_PASN] = "pasn",
-		};
-		const char *auth_alg = NULL;
 		const u8 *dpp_pkhash;
 		const char *keyid;
 		char dpp_pkhash_buf[100];
 		char keyid_buf[100];
 		char ip_addr[100];
 		char vlanid_buf[20];
-		char alg_buf[100];
 
 		dpp_pkhash_buf[0] = '\0';
 		keyid_buf[0] = '\0';
 		ip_addr[0] = '\0';
 		vlanid_buf[0] = '\0';
-		alg_buf[0] = '\0';
 
 #ifdef CONFIG_P2P
 		if (wpa_auth_get_ip_addr(sta->wpa_sm, ip_addr_buf) == 0) {
@@ -1861,14 +1796,6 @@ void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 			ip_ptr = ip_addr_buf;
 		}
 #endif /* CONFIG_P2P */
-		WIFIMON_OK(sta, S_AUTHORIZED, WMC_OK, 0, 0, "authorized=%d mac=" MACSTR " bssid=" MACSTR " %s", authorized, MAC2STR(sta->addr), MAC2STR(hapd->own_addr), ip_addr);
-
-		if (sta->auth_alg < ARRAY_SIZE(auth_algs))
-			auth_alg = auth_algs[sta->auth_alg];
-
-		if (auth_alg)
-			os_snprintf(alg_buf, sizeof(alg_buf),
-				" auth_alg=%s", auth_alg);
 
 		keyid = ap_sta_wpa_get_keyid(hapd, sta);
 		if (keyid) {
@@ -1894,25 +1821,17 @@ void ap_sta_set_authorized_event(struct hostapd_data *hapd,
 				    " vlanid=%u", sta->vlan_id);
 #endif /* CONFIG_NO_VLAN */
 
-		hostapd_ubus_notify_authorized(hapd, sta, auth_alg);
-		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_CONNECTED "%s%s%s%s%s%s",
-			buf, ip_addr, keyid_buf, dpp_pkhash_buf, vlanid_buf, alg_buf);
+		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_CONNECTED "%s%s%s%s%s",
+			buf, ip_addr, keyid_buf, dpp_pkhash_buf, vlanid_buf);
 
 		if (hapd->msg_ctx_parent &&
 		    hapd->msg_ctx_parent != hapd->msg_ctx)
 			wpa_msg_no_global(hapd->msg_ctx_parent, MSG_INFO,
-					  AP_STA_CONNECTED "%s%s%s%s%s%s",
+					  AP_STA_CONNECTED "%s%s%s%s%s",
 					  buf, ip_addr, keyid_buf,
-					  dpp_pkhash_buf, vlanid_buf, alg_buf);
-
-		WIFIMON_OK(sta, S_ACTIVE_SESSION, WMC_OK, 0, 0, "active_session session=connect session_end=1 mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+					  dpp_pkhash_buf, vlanid_buf);
 	} else {
-		WIFIMON_OK(sta, S_ACTIVE_SESSION, WMC_OK, 0, 0,
-			   "active_session session=disconnect session_end=1 mac=" MACSTR
-			   " bssid=" MACSTR,
-			   MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_STA_DISCONNECTED "%s", buf);
-		hostapd_ubus_notify(hapd, "disassoc", sta->addr);
 
 		if (hapd->msg_ctx_parent &&
 		    hapd->msg_ctx_parent != hapd->msg_ctx)
@@ -1962,10 +1881,8 @@ void ap_sta_disconnect(struct hostapd_data *hapd, struct sta_info *sta,
 	if (sta == NULL && addr)
 		sta = ap_get_sta(hapd, addr);
 
-	if (addr) {
-		WIFIMON_INF(sta, S_DEAUTH_RES, wifimon_code_from_reason(reason), 0, reason, "ap_sta_disconnect session=disconnect session_start=1 mac=" MACSTR " bssid=" MACSTR " reason=%d", MAC2STR(addr), MAC2STR(hapd->own_addr), reason);
+	if (addr)
 		hostapd_drv_sta_deauth(hapd, addr, reason);
-	}
 
 	if (sta == NULL)
 		return;
@@ -2093,7 +2010,6 @@ static void ap_sta_delayed_1x_auth_fail_cb(void *eloop_ctx, void *timeout_ctx)
 	reason = sta->disconnect_reason_code;
 	if (!reason)
 		reason = WLAN_REASON_IEEE_802_1X_AUTH_FAILED;
-	WIFIMON_ERR(sta, S_DEAUTHORIZED, WMC_LOC_1X_AUTH_FAIL, 0, reason, "1x_auth_fail_disconnect mac=" MACSTR " bssid=" MACSTR " reason=%d", MAC2STR(sta->addr), MAC2STR(hapd->own_addr), reason);
 	ap_sta_disconnect(hapd, sta, sta->addr, reason);
 	if (sta->flags & WLAN_STA_WPS)
 		hostapd_wps_eap_completed(hapd);
@@ -2185,7 +2101,7 @@ int ap_sta_re_add(struct hostapd_data *hapd, struct sta_info *sta)
 		ap_sta_remove_link_sta(hapd, sta);
 	}
 #endif /* CONFIG_IEEE80211BE */
-	if(sta) WIFIMON_INF(sta, S_DEAUTHORIZED, WMC_OK, 0, 0, "ap_sta_remove_link deauthorize mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+
 	ap_sta_set_authorized(hapd, sta, 0);
 	hostapd_drv_sta_remove(hapd, sta->addr);
 	sta->flags &= ~(WLAN_STA_ASSOC | WLAN_STA_AUTH | WLAN_STA_AUTHORIZED);
@@ -2195,11 +2111,10 @@ int ap_sta_re_add(struct hostapd_data *hapd, struct sta_info *sta)
 			    sta->supported_rates_len,
 			    0, NULL, NULL, NULL, 0, NULL, 0, NULL,
 			    sta->flags, 0, 0, 0, 0,
-		    WIFIMON_ERR(sta, S_AUTH_HANDLE, WMC_LOC_UNK, 0, 0,
 			    mld_link_addr, mld_link_sta, eml_cap, epp_sta)) {
-		WIFIMON_ERR(sta, S_AUTH_HANDLE, WMC_LOC_UNK, 0, 0,
-			    "hostapd_sta_add_failed mac=" MACSTR " bssid=" MACSTR,
-			    MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+
+		WIFIMON_ERR(sta, S_AUTH_HANDLE, WMC_LOC_UNK, 0, 0,"hostapd_sta_add_failed mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+
 		hostapd_logger(hapd, sta->addr,
 			       HOSTAPD_MODULE_IEEE80211,
 			       HOSTAPD_LEVEL_NOTICE,
@@ -2207,7 +2122,6 @@ int ap_sta_re_add(struct hostapd_data *hapd, struct sta_info *sta)
 		return -1;
 	}
 
-	WIFIMON_OK(sta, S_AUTH_HANDLE, WMC_OK, 0, 0, "hostapd_sta_add_success mac=" MACSTR " bssid=" MACSTR, MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
 	sta->added_unassoc = 1;
 	return 0;
 }
@@ -2227,21 +2141,3 @@ void ap_sta_free_sta_profile(struct mld_info *info)
 	}
 }
 #endif /* CONFIG_IEEE80211BE */
-
-bool ap_sta_is_mld(struct hostapd_data *hapd,
-		   struct sta_info *sta)
-{
-#ifdef CONFIG_IEEE80211BE
-	return hapd->conf->mld_ap && sta && sta->mld_info.mld_sta;
-#else /* CONFIG_IEEE80211BE */
-	return false;
-#endif /* CONFIG_IEEE80211BE */
-}
-
-void ap_sta_set_mld(struct sta_info *sta, bool mld)
-{
-#ifdef CONFIG_IEEE80211BE
-	if (sta)
-		sta->mld_info.mld_sta = mld;
-#endif /* CONFIG_IEEE80211BE */
-}
