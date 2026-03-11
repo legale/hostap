@@ -4233,8 +4233,11 @@ void hostapd_new_assoc_sta(struct hostapd_data *hapd, struct sta_info *sta,
 	/* Start accounting here, if IEEE 802.1X and WPA are not used.
 	 * IEEE 802.1X/WPA code will start accounting after the station has
 	 * been authorized. */
-	if (!hapd->conf->ieee802_1x && !hapd->conf->wpa &&
-	    !hapd->conf->osen) {
+	if (!hapd->conf->ieee802_1x && !hapd->conf->wpa
+#ifdef CONFIG_HS20
+    && !hapd->conf->osen
+#endif
+	) {
 		if (sta)
 			WIFIMON_INF(sta, S_AUTHORIZED, WMC_OK, 0, 0, "sta_authorized mac=" MACSTR " bssid=" MACSTR,
 				    MAC2STR(sta->addr),
