@@ -8561,6 +8561,8 @@ static bool hostapd_skip_rnr(size_t i, struct mbssid_ie_profiles *skip_profiles,
 	 * include this. */
 	if (tbtt_info_len == RNR_TBTT_INFO_LEN && ap_mld && reporting_ap_mld)
 		return true;
+#endif /* CONFIG_IEEE80211BE */
+
 	/* No need to report if length is for MLD TBTT and the BSS is not
 	 * affiliated with an aP MLD. Normal TBTT will include this. */
 	if (tbtt_info_len == RNR_TBTT_INFO_MLD_LEN && !ap_mld)
