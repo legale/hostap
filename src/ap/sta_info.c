@@ -2195,7 +2195,6 @@ int ap_sta_re_add(struct hostapd_data *hapd, struct sta_info *sta)
 			    sta->supported_rates_len,
 			    0, NULL, NULL, NULL, 0, NULL, 0, NULL,
 			    sta->flags, 0, 0, 0, 0,
-		    WIFIMON_ERR(sta, S_AUTH_HANDLE, WMC_LOC_UNK, 0, 0,
 			    mld_link_addr, mld_link_sta, eml_cap, epp_sta)) {
 		WIFIMON_ERR(sta, S_AUTH_HANDLE, WMC_LOC_UNK, 0, 0,
 			    "hostapd_sta_add_failed mac=" MACSTR " bssid=" MACSTR,
