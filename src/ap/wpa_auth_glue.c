@@ -502,8 +502,33 @@ static void hostapd_wpa_auth_set_eapol(void *ctx, const u8 *addr,
 	struct hostapd_data *hapd = ctx;
 	struct sta_info *sta = ap_get_sta(hapd, addr);
 
-	if (sta == NULL)
+	if (sta == NULL) {
+		if (var == WPA_EAPOL_authorized) {
+			WIFIMON_ERR(NULL, S_AUTHORIZED, WMC_LOC_UNK, 0, 0,
+				    "authorize_missing_sta val=%d mac=" MACSTR
+				    " bssid=" MACSTR,
+				    value, MAC2STR(addr), MAC2STR(hapd->own_addr));
+			wpa_printf(MSG_DEBUG,
+				   "WPA: set_eapol(authorize=%d) for unknown STA "
+				   MACSTR, value, MAC2STR(addr));
+		}
 		return;
+	}
+
+	if (var == WPA_EAPOL_authorized) {
+		WIFIMON_INF(sta, S_AUTHORIZED, WMC_OK, 0, 0,
+			    "authorize_cb val=%d flags=0x%x auth_alg=%u added_unassoc=%u assoc_req_ok=%u mac="
+			    MACSTR " bssid=" MACSTR,
+			    value, sta->flags, sta->auth_alg, sta->added_unassoc,
+			    !!(sta->flags & WLAN_STA_ASSOC_REQ_OK),
+			    MAC2STR(addr), MAC2STR(hapd->own_addr));
+		wpa_printf(MSG_DEBUG,
+			   "WPA: set_eapol(authorize=%d) for STA " MACSTR
+			   " flags=0x%x auth_alg=%u added_unassoc=%u assoc_req_ok=%u",
+			   value, MAC2STR(addr), sta->flags, sta->auth_alg,
+			   sta->added_unassoc,
+			   !!(sta->flags & WLAN_STA_ASSOC_REQ_OK));
+	}
 	switch (var) {
 	case WPA_EAPOL_portEnabled:
 		ieee802_1x_notify_port_enabled(sta->eapol_sm, value);

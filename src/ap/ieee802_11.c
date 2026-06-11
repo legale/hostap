@@ -6351,6 +6351,21 @@ static void handle_assoc(struct hostapd_data *hapd,
 #endif /* CONFIG_MBO */
 
 	if (hapd->conf->wpa && check_sa_query(hapd, sta, reassoc, pos, left)) {
+		WIFIMON_INF(sta, S_AUTH_HANDLE, WMC_OK, 0,
+			    WLAN_STATUS_ASSOC_REJECTED_TEMPORARILY,
+			    "assoc_tmp_reject_sa_query reassoc=%d flags=0x%x "
+			    "sa_query_count=%u sa_query_timed_out=%u auth_alg=%u "
+			    "mac=" MACSTR " bssid=" MACSTR,
+			    reassoc, sta->flags, sta->sa_query_count,
+			    sta->sa_query_timed_out, sta->auth_alg,
+			    MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+		wpa_printf(MSG_DEBUG,
+			   "SA Query: reject association temporarily for " MACSTR
+			   " reassoc=%d flags=0x%x sa_query_count=%u "
+			   "sa_query_timed_out=%u auth_alg=%u",
+			   MAC2STR(sta->addr), reassoc, sta->flags,
+			   sta->sa_query_count, sta->sa_query_timed_out,
+			   sta->auth_alg);
 		resp = WLAN_STATUS_ASSOC_REJECTED_TEMPORARILY;
 		goto fail;
 	}

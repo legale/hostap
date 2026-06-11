@@ -121,8 +121,43 @@ static void ieee802_1x_set_authorized(struct hostapd_data *hapd,
 
 	update = ap_sta_set_authorized_flag(hapd, sta, authorized);
 	res = hostapd_set_authorized(hapd, sta, authorized);
+	WIFIMON_INF(sta, S_AUTHORIZED, res ? WMC_LOC_UNK : WMC_OK, res, 0,
+		    "authorize_apply authorized=%d update=%d res=%d errno=%d "
+		    "flags=0x%x assoc=%u auth=%u authorized_flag=%u "
+		    "assoc_req_ok=%u added_unassoc=%u auth_alg=%u mac=" MACSTR
+		    " bssid=" MACSTR,
+		    authorized, update, res, errno, sta->flags,
+		    !!(sta->flags & WLAN_STA_ASSOC),
+		    !!(sta->flags & WLAN_STA_AUTH),
+		    !!(sta->flags & WLAN_STA_AUTHORIZED),
+		    !!(sta->flags & WLAN_STA_ASSOC_REQ_OK),
+		    sta->added_unassoc, sta->auth_alg,
+		    MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+	wpa_printf(MSG_DEBUG,
+		   "IEEE 802.1X: sta_authorized addr=" MACSTR
+		   " authorized=%d update=%d res=%d errno=%d flags=0x%x "
+		   "assoc=%u auth=%u authorized_flag=%u assoc_req_ok=%u "
+		   "added_unassoc=%u auth_alg=%u",
+		   MAC2STR(sta->addr), authorized, update, res, errno,
+		   sta->flags,
+		   !!(sta->flags & WLAN_STA_ASSOC),
+		   !!(sta->flags & WLAN_STA_AUTH),
+		   !!(sta->flags & WLAN_STA_AUTHORIZED),
+		   !!(sta->flags & WLAN_STA_ASSOC_REQ_OK),
+		   sta->added_unassoc, sta->auth_alg);
 	if (update)
 		ap_sta_set_authorized_event(hapd, sta, authorized);
+	else {
+		WIFIMON_INF(sta, S_AUTHORIZED, WMC_OK, 0, 0,
+			    "authorize_skip_nochange target=%d flags=0x%x mac="
+			    MACSTR " bssid=" MACSTR,
+			    authorized, sta->flags,
+			    MAC2STR(sta->addr), MAC2STR(hapd->own_addr));
+		wpa_printf(MSG_DEBUG,
+			   "IEEE 802.1X: skip authorized event for " MACSTR
+			   " because authorized flag already matched target=%d",
+			   MAC2STR(sta->addr), authorized);
+	}
 	hostapd_logger(hapd, sta->addr, HOSTAPD_MODULE_IEEE8021X,
 		       HOSTAPD_LEVEL_DEBUG, "%sauthorizing port",
 		       authorized ? "" : "un");
