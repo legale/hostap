@@ -10,6 +10,9 @@
 #include "dfs.h"
 #include "acs.h"
 #include "ieee802_11_auth.h"
+#ifndef CONFIG_NO_RADIUS
+#include "radius/radius_client.h"
+#endif /* CONFIG_NO_RADIUS */
 #include <libubox/uloop.h>
 
 static uc_resource_type_t *global_type, *bss_type, *iface_type;
@@ -286,6 +289,63 @@ hostapd_remove_iface_bss_conf(struct hostapd_config *iconf,
 	for (i++; i < iconf->num_bss; i++)
 		iconf->bss[i - 1] = iconf->bss[i];
 	iconf->num_bss--;
+}
+
+
+static uc_value_t *
+uc_hostapd_bss_update_radius_server(uc_vm_t *vm, size_t nargs, int auth)
+{
+	struct hostapd_data *hapd = uc_fn_thisval("hostapd.bss");
+	uc_value_t *addr = uc_fn_arg(0);
+	uc_value_t *port = uc_fn_arg(1);
+	int64_t port_val;
+	int port_num;
+	int ret = -1;
+
+	(void) vm;
+	(void) nargs;
+
+	//hot_update: validate args before touching RADIUS runtime
+	if (!hapd || ucv_type(addr) != UC_STRING ||
+	    ucv_type(port) != UC_INTEGER) {
+		goto out;
+	}
+
+	port_val = ucv_int64_get(port);
+	if (port_val <= 0 || port_val > 65535) {
+		goto out;
+	}
+	port_num = port_val;
+
+#ifndef CONFIG_NO_RADIUS
+	//hot_update: switch only RADIUS endpoint, keep BSS/AP running
+	if (auth) {
+		ret = radius_client_update_auth_server(hapd->radius,
+						       ucv_string_get(addr),
+						       port_num);
+	} else {
+		ret = radius_client_update_acct_server(hapd->radius,
+						       ucv_string_get(addr),
+						       port_num);
+	}
+#endif /* CONFIG_NO_RADIUS */
+
+out:
+	return ucv_int64_new(ret);
+}
+
+
+static uc_value_t *
+uc_hostapd_bss_update_radius_auth_server(uc_vm_t *vm, size_t nargs)
+{
+	return uc_hostapd_bss_update_radius_server(vm, nargs, 1);
+}
+
+
+static uc_value_t *
+uc_hostapd_bss_update_radius_acct_server(uc_vm_t *vm, size_t nargs)
+{
+	return uc_hostapd_bss_update_radius_server(vm, nargs, 0);
 }
 
 
@@ -871,6 +931,8 @@ int hostapd_ucode_init(struct hapd_interfaces *ifaces)
 	static const uc_function_list_t bss_fns[] = {
 		{ "ctrl", uc_hostapd_bss_ctrl },
 		{ "set_config", uc_hostapd_bss_set_config },
+		{ "update_radius_auth_server", uc_hostapd_bss_update_radius_auth_server },
+		{ "update_radius_acct_server", uc_hostapd_bss_update_radius_acct_server },
 		{ "rename", uc_hostapd_bss_rename },
 		{ "delete", uc_hostapd_bss_delete },
 	};
