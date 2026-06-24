@@ -981,7 +981,7 @@ int radius_msg_verify_msg_auth(struct radius_msg *msg, const u8 *secret,
 
 	for (i = 0; i < msg->attr_used; i++) {
 		tmp = radius_get_attr_hdr(msg, i);
-		wpa_printf(MSG_MSGDUMP, "attr %zu: type: %u", i, tmp->type);
+		wpa_printf(MSG_MSGDUMP, "attr: %zu type: %u", i, tmp->type);
 		if (tmp->type == RADIUS_ATTR_MESSAGE_AUTHENTICATOR) {
 			if (attr != NULL) {
 				wpa_printf(MSG_INFO, "Multiple Message-Authenticator attributes in RADIUS message");
