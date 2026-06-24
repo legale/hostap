@@ -276,6 +276,10 @@ void radius_client_set_interim_error_cb(struct radius_client_data *radius,
 					void *ctx);
 int radius_client_get_local_addr(struct radius_client_data *radius,
 				 struct hostapd_ip_addr * addr);
+int radius_client_update_auth_server(struct radius_client_data *radius,
+				     const char *addr, int port);
+int radius_client_update_acct_server(struct radius_client_data *radius,
+				     const char *addr, int port);
 int radius_client_send(struct radius_client_data *radius,
 		       struct radius_msg *msg,
 		       RadiusType msg_type, const u8 *addr);

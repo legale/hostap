@@ -1954,6 +1954,60 @@ radius_change_server(struct radius_client_data *radius,
 }
 
 
+static int radius_client_update_server(struct radius_client_data *radius,
+				       struct hostapd_radius_server *serv,
+				       const char *addr, int port, int auth)
+{
+	struct hostapd_radius_server nserv;
+	struct hostapd_ip_addr ip;
+
+	if (!radius || !serv || !addr || port <= 0 || port > 65535)
+		return -1;
+
+	if (serv->tls)
+		return -1;
+
+	if (hostapd_parse_ip_addr(addr, &ip) < 0)
+		return -1;
+
+	if (serv->port == port && hostapd_ip_equal(&serv->addr, &ip))
+		return 0;
+
+	nserv = *serv;
+	nserv.addr = ip;
+	nserv.port = port;
+
+	if (radius_change_server(radius, &nserv, serv, auth) < 0)
+		return -1;
+
+	serv->addr = ip;
+	serv->port = port;
+	return 0;
+}
+
+
+int radius_client_update_auth_server(struct radius_client_data *radius,
+				     const char *addr, int port)
+{
+	if (!radius || !radius->conf)
+		return -1;
+
+	return radius_client_update_server(radius, radius->conf->auth_server,
+					   addr, port, 1);
+}
+
+
+int radius_client_update_acct_server(struct radius_client_data *radius,
+				     const char *addr, int port)
+{
+	if (!radius || !radius->conf)
+		return -1;
+
+	return radius_client_update_server(radius, radius->conf->acct_server,
+					   addr, port, 0);
+}
+
+
 static void radius_retry_primary_timer(void *eloop_ctx, void *timeout_ctx)
 {
 	struct radius_client_data *radius = eloop_ctx;
