@@ -1141,6 +1141,40 @@ static int hostapd_ctrl_iface_get_config(struct hostapd_data *hapd,
 }
 
 
+#ifndef CONFIG_NO_RADIUS
+static int hostapd_ctrl_iface_update_radius_server(struct hostapd_data *hapd,
+						   char *cmd, int auth)
+{
+	char *port_str, *end;
+	long port;
+	int ret;
+
+	port_str = os_strchr(cmd, ' ');
+	if (!port_str)
+		return -1;
+	*port_str++ = '\0';
+
+	if (!cmd[0] || !port_str[0])
+		return -1;
+
+	port = strtol(port_str, &end, 10);
+	if (*end || port <= 0 || port > 65535)
+		return -1;
+
+	//hot_update: switch only RADIUS addr/port, keep BSS alive
+	if (auth)
+		ret = radius_client_update_auth_server(hapd->radius, cmd, port);
+	else
+		ret = radius_client_update_acct_server(hapd->radius, cmd, port);
+	if (ret < 0)
+		return -1;
+
+	wpa_printf(MSG_INFO, "RADIUS hot_update: %s server %s:%ld",
+		   auth ? "auth" : "acct", cmd, port);
+	return 0;
+}
+#endif /* CONFIG_NO_RADIUS */
+
 static int hostapd_ctrl_iface_set_band(struct hostapd_data *hapd,
 				       const char *bands)
 {
@@ -4127,6 +4161,22 @@ static int hostapd_ctrl_iface_receive_process(struct hostapd_data *hapd,
 	} else if (os_strcmp(buf, "GET_CONFIG") == 0) {
 		reply_len = hostapd_ctrl_iface_get_config(hapd, reply,
 							  reply_size);
+#ifndef CONFIG_NO_RADIUS
+	} else if (os_strncmp(buf, "UPDATE_RADIUS_AUTH_SERVER ",
+			      sizeof("UPDATE_RADIUS_AUTH_SERVER ") - 1) == 0) {
+		//hot_update: manual auth endpoint switch for hostapd_cli
+		if (hostapd_ctrl_iface_update_radius_server(
+			    hapd, buf + sizeof("UPDATE_RADIUS_AUTH_SERVER ") - 1,
+			    1))
+			reply_len = -1;
+	} else if (os_strncmp(buf, "UPDATE_RADIUS_ACCT_SERVER ",
+			      sizeof("UPDATE_RADIUS_ACCT_SERVER ") - 1) == 0) {
+		//hot_update: manual acct endpoint switch for hostapd_cli
+		if (hostapd_ctrl_iface_update_radius_server(
+			    hapd, buf + sizeof("UPDATE_RADIUS_ACCT_SERVER ") - 1,
+			    0))
+			reply_len = -1;
+#endif /* CONFIG_NO_RADIUS */
 	} else if (os_strncmp(buf, "SET ", 4) == 0) {
 		if (hostapd_ctrl_iface_set(hapd, buf + 4))
 			reply_len = -1;

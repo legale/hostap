@@ -1098,6 +1098,45 @@ static char ** hostapd_complete_set(const char *str, int pos)
 }
 
 
+static int hostapd_cli_cmd_update_radius_server(struct wpa_ctrl *ctrl,
+						const char *cmd, int argc,
+						char *argv[])
+{
+	char buf[256];
+	int res;
+
+	if (argc != 2) {
+		printf("Invalid %s command: needs address and port\n", cmd);
+		return -1;
+	}
+
+	//hot_update: send addr/port only, no config reload
+	res = os_snprintf(buf, sizeof(buf), "%s %s %s", cmd, argv[0], argv[1]);
+	if (os_snprintf_error(sizeof(buf), res)) {
+		printf("Too long %s command.\n", cmd);
+		return -1;
+	}
+
+	return wpa_ctrl_command(ctrl, buf);
+}
+
+
+static int hostapd_cli_cmd_update_radius_auth_server(struct wpa_ctrl *ctrl,
+						     int argc, char *argv[])
+{
+	return hostapd_cli_cmd_update_radius_server(
+		ctrl, "UPDATE_RADIUS_AUTH_SERVER", argc, argv);
+}
+
+
+static int hostapd_cli_cmd_update_radius_acct_server(struct wpa_ctrl *ctrl,
+						     int argc, char *argv[])
+{
+	return hostapd_cli_cmd_update_radius_server(
+		ctrl, "UPDATE_RADIUS_ACCT_SERVER", argc, argv);
+}
+
+
 static int hostapd_cli_cmd_get(struct wpa_ctrl *ctrl, int argc, char *argv[])
 {
 	char cmd[256];
@@ -1767,6 +1806,10 @@ static const struct hostapd_cli_cmd hostapd_cli_commands[] = {
 	  "<name> <value> = set runtime variables" },
 	{ "get", hostapd_cli_cmd_get, hostapd_complete_get,
 	  "<name> = get runtime info" },
+	{ "update_radius_auth_server", hostapd_cli_cmd_update_radius_auth_server,
+	  NULL, "<addr> <port> = update RADIUS auth server without reload" },
+	{ "update_radius_acct_server", hostapd_cli_cmd_update_radius_acct_server,
+	  NULL, "<addr> <port> = update RADIUS acct server without reload" },
 	{ "set_qos_map_set", hostapd_cli_cmd_set_qos_map_set, NULL,
 	  "<arg,arg,...> = set QoS Map set element" },
 	{ "send_qos_map_conf", hostapd_cli_cmd_send_qos_map_conf,
