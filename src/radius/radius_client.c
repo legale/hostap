@@ -1964,6 +1964,7 @@ static int radius_client_update_server(struct radius_client_data *radius,
 	if (!radius || !serv || !addr || port <= 0 || port > 65535)
 		return -1;
 
+	//hot_update: RadSec has extra state, keep old reload path
 	if (serv->tls)
 		return -1;
 
@@ -1977,6 +1978,7 @@ static int radius_client_update_server(struct radius_client_data *radius,
 	nserv.addr = ip;
 	nserv.port = port;
 
+	//hot_update: switch socket before committing addr/port
 	if (radius_change_server(radius, &nserv, serv, auth) < 0)
 		return -1;
 
