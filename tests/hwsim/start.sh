@@ -65,6 +65,16 @@ else
     GROUP=adm
 fi
 
+run_sudo()
+{
+    if [ -n "$OPENSSL_CONF" ]; then
+        sudo env OPENSSL_CONF="$OPENSSL_CONF" \
+            OPENSSL_ENGINES="$OPENSSL_ENGINES" "$@"
+    else
+        sudo "$@"
+    fi
+}
+
 for i in 0 1 2; do
     sed "s/ GROUP=.*$/ GROUP=$GROUP/" "$DIR/p2p$i.conf" > "$LOGDIR/p2p$i.conf"
 done
@@ -126,16 +136,16 @@ for i in 0 1 2; do
 	    DBUSARG="-u"
 	fi
     fi
-    sudo $(printf -- "$VALGRIND_WPAS" $i) $WPAS -g /tmp/wpas-wlan$i -G$GROUP -Dnl80211 -iwlan$i -c $LOGDIR/p2p$i.conf \
+    run_sudo $(printf -- "$VALGRIND_WPAS" $i) $WPAS -g /tmp/wpas-wlan$i -G$GROUP -Dnl80211 -iwlan$i -c $LOGDIR/p2p$i.conf \
          -ddKt$TRACE -f $LOGDIR/log$i $DBUSARG &
 done
-sudo $(printf -- "$VALGRIND_WPAS" 5) $WPAS -g /tmp/wpas-wlan5 -G$GROUP \
+run_sudo $(printf -- "$VALGRIND_WPAS" 5) $WPAS -g /tmp/wpas-wlan5 -G$GROUP \
     -ddKt$TRACE -f $LOGDIR/log5 &
-sudo $(printf -- "$VALGRIND_WPAS" 6) $WPAS -g /tmp/wpas-wlan6 -G$GROUP \
+run_sudo $(printf -- "$VALGRIND_WPAS" 6) $WPAS -g /tmp/wpas-wlan6 -G$GROUP \
     -ddKt$TRACE -f $LOGDIR/log6 &
-sudo $(printf -- "$VALGRIND_WPAS" 7) $WPAS -g /tmp/wpas-wlan7 -G$GROUP \
+run_sudo $(printf -- "$VALGRIND_WPAS" 7) $WPAS -g /tmp/wpas-wlan7 -G$GROUP \
     -ddKt$TRACE -f $LOGDIR/log7 &
-sudo $VALGRIND_HAPD $HAPD -ddKt$TRACE -g /var/run/hostapd-global -G $GROUP -f $LOGDIR/hostapd &
+run_sudo $VALGRIND_HAPD $HAPD -ddKt$TRACE -g /var/run/hostapd-global -G $GROUP -f $LOGDIR/hostapd &
 HPID=$!
 
 if [ -z "$VM" ]; then
@@ -165,7 +175,7 @@ if [ ! -r $LOGDIR/ocsp-server-cache.der ]; then
 fi
 
 touch $LOGDIR/hostapd.db
-sudo $HAPD_AS -ddKt $LOGDIR/as.conf $LOGDIR/as2.conf > $LOGDIR/auth_serv &
+run_sudo $HAPD_AS -ddKt $LOGDIR/as.conf $LOGDIR/as2.conf > $LOGDIR/auth_serv &
 
 # wait for programs to be fully initialized
 for i in 0 1 2 3 4 5 6 7 8 9; do

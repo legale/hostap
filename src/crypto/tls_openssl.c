@@ -15,7 +15,7 @@
 #include <fcntl.h>
 #endif /* CONFIG_TESTING_OPTIONS */
 
-#ifndef CONFIG_SMARTCARD
+#if !defined(CONFIG_SMARTCARD) && !defined(CONFIG_GOST_ENGINE)
 #ifndef OPENSSL_NO_ENGINE
 #ifndef ANDROID
 #define OPENSSL_NO_ENGINE
@@ -27,6 +27,9 @@
 /* OpenSSL 3.0 has moved away from the engine API */
 #define OPENSSL_SUPPRESS_DEPRECATED
 #include <openssl/engine.h>
+#ifdef CONFIG_GOST_ENGINE_STATIC
+#include <gost-engine.h>
+#endif /* CONFIG_GOST_ENGINE_STATIC */
 #endif /* OPENSSL_NO_ENGINE */
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -1284,6 +1287,27 @@ void * tls_init(const struct tls_config *conf)
 		void openssl_load_legacy_provider(void);
 
 		openssl_load_legacy_provider();
+#if defined(CONFIG_GOST_ENGINE) && !defined(OPENSSL_NO_ENGINE)
+		ENGINE *e;
+
+#ifdef CONFIG_GOST_ENGINE_STATIC
+		wpa_printf(MSG_DEBUG, "ENGINE: Loading static GOST engine");
+		ENGINE_load_gost();
+#else /* CONFIG_GOST_ENGINE_STATIC */
+		wpa_printf(MSG_DEBUG, "ENGINE: Loading GOST engine");
+#endif /* CONFIG_GOST_ENGINE_STATIC */
+		e = ENGINE_by_id("gost");
+		if (!e) {
+			wpa_printf(MSG_ERROR, "ENGINE: Failed to load GOST engine");
+			return NULL;
+		}
+		if (!ENGINE_set_default(e, ENGINE_METHOD_ALL)) {
+			ENGINE_free(e);
+			wpa_printf(MSG_ERROR, "ENGINE: Failed to enable GOST engine");
+			return NULL;
+		}
+		ENGINE_free(e);
+#endif /* CONFIG_GOST_ENGINE && !OPENSSL_NO_ENGINE */
 #if !defined(ANDROID) && defined(OPENSSL_NO_ENGINE)
 		openssl_load_pkcs11_provider();
 #endif /* !ANDROID && OPENSSL_NO_ENGINE */
@@ -6060,18 +6084,6 @@ int tls_global_set_params(void *tls_ctx,
 			return -1;
 	}
 
-	if (tls_global_ca_cert(data, params->ca_cert) ||
-	    tls_global_client_cert(data, params->client_cert) ||
-	    tls_global_private_key(data, params->private_key,
-				   params->private_key_passwd) ||
-	    tls_global_client_cert(data, params->client_cert2) ||
-	    tls_global_private_key(data, params->private_key2,
-				   params->private_key_passwd2) ||
-	    tls_global_dh(data, params->dh_file)) {
-		wpa_printf(MSG_INFO, "TLS: Failed to set global parameters");
-		return -1;
-	}
-
 	os_free(data->openssl_ciphers);
 	if (params->openssl_ciphers) {
 		data->openssl_ciphers = os_strdup(params->openssl_ciphers);
@@ -6085,6 +6097,18 @@ int tls_global_set_params(void *tls_ctx,
 		wpa_printf(MSG_INFO,
 			   "OpenSSL: Failed to set cipher string '%s'",
 			   params->openssl_ciphers);
+		return -1;
+	}
+
+	if (tls_global_ca_cert(data, params->ca_cert) ||
+	    tls_global_client_cert(data, params->client_cert) ||
+	    tls_global_private_key(data, params->private_key,
+				   params->private_key_passwd) ||
+	    tls_global_client_cert(data, params->client_cert2) ||
+	    tls_global_private_key(data, params->private_key2,
+				   params->private_key_passwd2) ||
+	    tls_global_dh(data, params->dh_file)) {
+		wpa_printf(MSG_INFO, "TLS: Failed to set global parameters");
 		return -1;
 	}
 

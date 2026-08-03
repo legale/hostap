@@ -2574,6 +2574,44 @@ def test_ap_wpa2_eap_tls(dev, apdev):
                 private_key="auth_serv/user.key")
     eap_reauth(dev[0], "TLS")
 
+def test_eap_tls_gost(dev, apdev):
+    """EAP-TLS with GOST certificates and a GOST TLS cipher suite"""
+    pki = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                       "../../../.gost/pki512"))
+    cipher = "GOST2012-KUZNYECHIK-KUZNYECHIKOMAC@SECLEVEL=0"
+    params = int_eap_server_params()
+    params["eap_user_file"] = os.path.join(pki, "eap_user.conf")
+    params["ca_cert"] = os.path.join(pki, "ca.crt")
+    params["server_cert"] = os.path.join(pki, "server.crt")
+    params["private_key"] = os.path.join(pki, "server.key")
+    params["openssl_ciphers"] = cipher
+    hapd = hostapd.add_ap(apdev[0], params)
+    eap_connect(dev[0], hapd, "TLS", "gost client",
+                ca_cert=os.path.join(pki, "ca.crt"),
+                client_cert=os.path.join(pki, "client.crt"),
+                private_key=os.path.join(pki, "client.key"),
+                openssl_ciphers=cipher,
+                phase1="tls_disable_tlsv1_0=1 tls_disable_tlsv1_1=1 "
+                        "tls_disable_tlsv1_3=1")
+    version = dev[0].get_status_field("eap_tls_version")
+    if version != "TLSv1.2":
+        raise Exception("Unexpected TLS version: " + str(version))
+    negotiated = dev[0].get_status_field("EAP TLS cipher")
+    if negotiated != "GOST2012-KUZNYECHIK-KUZNYECHIKOMAC":
+        raise Exception("Unexpected GOST TLS cipher: " + str(negotiated))
+
+    dev[0].request("REMOVE_NETWORK all")
+    dev[0].wait_disconnected()
+    eap_connect(dev[0], hapd, "TLS", "gost client",
+                ca_cert=os.path.join(pki, "ca.crt"),
+                client_cert=os.path.join(pki, "client.crt"),
+                private_key=os.path.join(pki, "client.key"),
+                openssl_ciphers="ECDHE-RSA-AES256-GCM-SHA384",
+                phase1="tls_disable_tlsv1_0=1 tls_disable_tlsv1_1=1 "
+                        "tls_disable_tlsv1_3=1",
+                expect_failure=True, local_error_report=True,
+                maybe_local_error=True)
+
 def test_eap_tls_pkcs8_pkcs5_v2_des3(dev, apdev):
     """WPA2-Enterprise connection using EAP-TLS and PKCS #8, PKCS #5 v2 DES3 key"""
     params = hostapd.wpa2_eap_params(ssid="test-wpa2-eap")
