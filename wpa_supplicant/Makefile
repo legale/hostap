@@ -1287,13 +1287,22 @@ endif
 CFLAGS += -DTLS_DEFAULT_CIPHERS=\"$(CONFIG_TLS_DEFAULT_CIPHERS)\"
 endif
 
+ifeq ($(CONFIG_TLS), cryptopro)
+CONFIG_TLS_CRYPTOPRO=y
+override CONFIG_TLS=mbedtls
+endif
+
 ifeq ($(CONFIG_TLS), mbedtls)
 ifndef CONFIG_CRYPTO
 CONFIG_CRYPTO=mbedtls
 endif
 ifdef TLS_FUNCS
+ifdef CONFIG_TLS_CRYPTOPRO
+OBJS += ../src/crypto/tls_cryptopro.o
+else
 OBJS += ../src/crypto/tls_mbedtls.o
 LIBS += -lmbedtls -lmbedx509
+endif
 endif
 OBJS += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
 OBJS_p += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
@@ -1302,8 +1311,18 @@ ifeq ($(CONFIG_CRYPTO), mbedtls)
 LIBS += -lmbedcrypto
 LIBS_p += -lmbedcrypto
 # XXX: create a config option?
+ifndef CONFIG_TLS_CRYPTOPRO
 CFLAGS += -DCRYPTO_RSA_OAEP_SHA256
 endif
+endif
+endif
+ifdef CONFIG_TLS_CRYPTOPRO
+CFLAGS += -DCRYPTO_MBEDTLS_CRYPTO_RSA
+CFLAGS += -DUNIX -DHAVE_LIMITS_H -DSIZEOF_VOID_P=8
+CFLAGS += -I/opt/cprocsp/include -I/opt/cprocsp/include/cpcsp
+LIBS += -L/opt/cprocsp/lib/amd64 -Wl,-rpath,/opt/cprocsp/lib/amd64
+LIBS += -lssp -lcapi10 -lcapi20 -lrdrsup -ldl -lpthread
+NEED_ECC=y
 endif
 
 ifeq ($(CONFIG_TLS), gnutls)
