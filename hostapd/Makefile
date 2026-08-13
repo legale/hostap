@@ -805,6 +805,10 @@ LIBS += -lmbedcrypto
 LIBS_h += -lmbedcrypto
 LIBS_n += -lmbedcrypto
 LIBS_s += -lmbedcrypto
+LIBS += -lpogost
+LIBS_h += -lpogost
+LIBS_n += -lpogost
+LIBS_s += -lpogost
 # XXX: create a config option?
 CFLAGS += -DCRYPTO_RSA_OAEP_SHA256
 endif

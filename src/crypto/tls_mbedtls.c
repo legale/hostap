@@ -1166,6 +1166,9 @@ tls_mbedtls_set_ciphers(struct tls_conf *tls_conf, const char *ciphers)
     do {
         next = os_strchr(ciphers, ':');
         clen = next ? (size_t)(next - ciphers) : os_strlen(ciphers);
+        const char *option = os_strchr(ciphers, '@');
+        if (option && option < ciphers + clen)
+            clen = option - ciphers;
         if (!clen)
             continue;
 
@@ -2271,6 +2274,14 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
 
 	switch (ret) {
 	case 0:
+		if (!conn->established) {
+		  const char *suite = mbedtls_ssl_get_ciphersuite(&conn->ssl);
+		  int suite_id = mbedtls_ssl_get_ciphersuite_id(suite);
+
+		  wpa_printf(MSG_DEBUG,
+			     "MTLS: Server selected cipher suite 0x%04x",
+			     suite_id);
+		}
 		conn->established = 1;
 		if (conn->push_buf == NULL)
 			/* Need to return something to get final TLS ACK. */
