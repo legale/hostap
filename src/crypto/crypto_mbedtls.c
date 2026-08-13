@@ -16,6 +16,7 @@
 #include <mbedtls/asn1write.h>
 #include <mbedtls/aes.h>
 #include <mbedtls/md.h>
+#include <mbedtls/pkcs5.h>
 #include <mbedtls/md5.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
@@ -149,6 +150,12 @@
 
 #if !defined(CONFIG_NO_PBKDF2)
 #define CRYPTO_MBEDTLS_PBKDF2_SHA1
+#if defined(CONFIG_SHA256)
+#define CRYPTO_MBEDTLS_PBKDF2_SHA256
+#endif
+#if defined(CONFIG_SHA384)
+#define CRYPTO_MBEDTLS_PBKDF2_SHA384
+#endif
 #endif /* pbkdf2_sha1() */
 
 #if defined(EAP_IKEV2) \
@@ -957,6 +964,26 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len,
 	mbedtls_md_free(&ctx);
 	return ret;
   #endif
+}
+#endif
+
+#ifdef CRYPTO_MBEDTLS_PBKDF2_SHA256
+int pbkdf2_sha256(const char *passphrase, const u8 *salt, size_t salt_len,
+                  int iterations, u8 *buf, size_t buflen)
+{
+	return mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
+		(const u8 *)passphrase, os_strlen(passphrase), salt, salt_len,
+		iterations, buflen, buf) ? -1 : 0;
+}
+#endif
+
+#ifdef CRYPTO_MBEDTLS_PBKDF2_SHA384
+int pbkdf2_sha384(const char *passphrase, const u8 *salt, size_t salt_len,
+                  int iterations, u8 *buf, size_t buflen)
+{
+	return mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA384,
+		(const u8 *)passphrase, os_strlen(passphrase), salt, salt_len,
+		iterations, buflen, buf) ? -1 : 0;
 }
 #endif
 
