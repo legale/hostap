@@ -5848,6 +5848,28 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
 					      params->client_cert_blob_len))
 		return -1;
 
+	if (!params->openssl_ciphers) {
+		X509 *cert = SSL_get_certificate(conn->ssl);
+		EVP_PKEY *pkey = cert ? X509_get0_pubkey(cert) : NULL;
+		int type = pkey ? EVP_PKEY_id(pkey) : NID_undef;
+
+		if (type == NID_id_GostR3410_2012_256 ||
+		    type == NID_id_GostR3410_2012_512) {
+			wpa_printf(MSG_DEBUG,
+				   "OpenSSL: GOST certificate - enable GOST cipher suite");
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && \
+	!defined(LIBRESSL_VERSION_NUMBER)
+			SSL_set_security_level(conn->ssl, 0);
+#endif
+			if (SSL_set_cipher_list(conn->ssl,
+						"GOST2012-KUZNYECHIK-KUZNYECHIKOMAC") != 1) {
+				wpa_printf(MSG_INFO,
+					   "OpenSSL: Failed to enable GOST cipher suite");
+				return -1;
+			}
+		}
+	}
+
 	if (engine_id && key_id) {
 #if !defined(ANDROID) && defined(OPENSSL_NO_ENGINE)
 		if (!openssl_can_use_provider(engine_id, key_id))
@@ -6101,8 +6123,34 @@ int tls_global_set_params(void *tls_ctx,
 	}
 
 	if (tls_global_ca_cert(data, params->ca_cert) ||
-	    tls_global_client_cert(data, params->client_cert) ||
-	    tls_global_private_key(data, params->private_key,
+	    tls_global_client_cert(data, params->client_cert)) {
+		wpa_printf(MSG_INFO, "TLS: Failed to set global parameters");
+		return -1;
+	}
+
+	if (!params->openssl_ciphers) {
+		X509 *cert = SSL_CTX_get0_certificate(ssl_ctx);
+		EVP_PKEY *pkey = cert ? X509_get0_pubkey(cert) : NULL;
+		int type = pkey ? EVP_PKEY_id(pkey) : NID_undef;
+
+		if (type == NID_id_GostR3410_2012_256 ||
+		    type == NID_id_GostR3410_2012_512) {
+			wpa_printf(MSG_DEBUG,
+				   "OpenSSL: GOST certificate - enable GOST cipher suite");
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && \
+	!defined(LIBRESSL_VERSION_NUMBER)
+			SSL_CTX_set_security_level(ssl_ctx, 0);
+#endif
+			if (SSL_CTX_set_cipher_list(ssl_ctx,
+						    "GOST2012-KUZNYECHIK-KUZNYECHIKOMAC") != 1) {
+				wpa_printf(MSG_INFO,
+					   "OpenSSL: Failed to enable GOST cipher suite");
+				return -1;
+			}
+		}
+	}
+
+	if (tls_global_private_key(data, params->private_key,
 				   params->private_key_passwd) ||
 	    tls_global_client_cert(data, params->client_cert2) ||
 	    tls_global_private_key(data, params->private_key2,

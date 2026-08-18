@@ -132,6 +132,43 @@ int wpa_ether_send(struct wpa_supplicant *wpa_s, const u8 *dest,
 
 #ifdef IEEE8021X_EAPOL
 
+static void wpas_eap_tls_client_hello(const u8 *buf, size_t len)
+{
+	const u8 *pos = buf, *end = buf + len;
+	size_t sid_len, cs_len;
+
+	if (len < 6 || pos[0] != EAP_CODE_RESPONSE || pos[4] != EAP_TYPE_TLS)
+		return;
+
+	pos += 5;
+	if (*pos & 0x80) {
+		if ((size_t) (end - pos) < 5)
+			return;
+		pos += 5;
+	} else {
+		pos++;
+	}
+
+	if ((size_t) (end - pos) < 5 + 4 + 2 + 32 + 1 ||
+	    pos[0] != 0x16)
+		return;
+	pos += 5;
+	if (pos[0] != 0x01)
+		return;
+	pos += 4 + 2 + 32;
+	sid_len = *pos++;
+	if ((size_t) (end - pos) < sid_len + 2)
+		return;
+	pos += sid_len;
+	cs_len = WPA_GET_BE16(pos);
+	pos += 2;
+	if (!cs_len || (cs_len & 1) || (size_t) (end - pos) < cs_len)
+		return;
+
+	wpa_hexdump(MSG_DEBUG, "EAP-TLS: ClientHello cipher_suites",
+		    pos, cs_len);
+}
+
 /**
  * wpa_supplicant_eapol_send - Send IEEE 802.1X EAPOL packet to Authenticator
  * @ctx: Pointer to wpa_supplicant data (wpa_s)
@@ -227,6 +264,8 @@ static int wpa_supplicant_eapol_send(void *ctx, int type, const u8 *buf,
 	if (msg == NULL)
 		return -1;
 
+	if (type == IEEE802_1X_TYPE_EAP_PACKET)
+		wpas_eap_tls_client_hello(buf, len);
 	wpa_printf(MSG_DEBUG, "TX EAPOL: dst=" MACSTR, MAC2STR(dst));
 	wpa_hexdump(MSG_MSGDUMP, "TX EAPOL", msg, msglen);
 	res = wpa_ether_send(wpa_s, dst, ETH_P_EAPOL, msg, msglen);

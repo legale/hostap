@@ -1192,6 +1192,16 @@ tls_mbedtls_set_ciphers(struct tls_conf *tls_conf, const char *ciphers)
                                                 ssl_preset_suiteb128_ciphersuites,
                                                 2);
         }
+        if (clen == 34 &&
+            os_memcmp(ciphers,
+                      "GOST2012-KUZNYECHIK-KUZNYECHIKOMAC", 34) == 0) {
+            static int gost_ciphersuites[] = {
+                MBEDTLS_TLS_GOSTR341112_256_WITH_KUZNYECHIK_CTR_OMAC,
+                0
+            };
+            return tls_mbedtls_set_ciphersuites(tls_conf,
+                                                gost_ciphersuites, 2);
+        }
         if (clen == 7 && os_memcmp(ciphers, "DEFAULT", 7) == 0)
             continue;
         if (clen == 6 && os_memcmp(ciphers, "AES128", 6) == 0) {
@@ -1760,6 +1770,24 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf,
 	if (params->openssl_ciphers) {
 		if (!tls_mbedtls_set_ciphers(tls_conf, params->openssl_ciphers))
 			return -1;
+	}
+	else if (tls_conf->has_client_cert) {
+		mbedtls_pk_type_t type =
+			mbedtls_pk_get_type(&tls_conf->client_cert.pk);
+
+		if (type == MBEDTLS_PK_GOST3410_256 ||
+		    type == MBEDTLS_PK_GOST3410_512) {
+			static int gost_ciphersuites[] = {
+				MBEDTLS_TLS_GOSTR341112_256_WITH_KUZNYECHIK_CTR_OMAC,
+				0
+			};
+
+			wpa_printf(MSG_DEBUG,
+				   "MTLS: GOST certificate - enable GOST cipher suite");
+			if (!tls_mbedtls_set_ciphersuites(tls_conf,
+							gost_ciphersuites, 2))
+				return -1;
+		}
 	}
 	else if (tls_conf->flags & TLS_CONN_SUITEB) {
 		/* special-case a select set of ciphers for hwsim tests */
