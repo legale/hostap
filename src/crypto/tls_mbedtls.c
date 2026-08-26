@@ -1343,6 +1343,32 @@ static int tls_mbedtls_readfile(const char *path, u8 **buf, size_t *n)
 	return 0;
 }
 
+static void tls_mbedtls_log_cert(const char *name, const mbedtls_x509_crt *crt)
+{
+	char subject[512];
+	char issuer[512];
+	char serial[128];
+	int subject_len;
+	int issuer_len;
+
+	if (!crt)
+		return;
+	subject_len = mbedtls_x509_dn_gets(subject, sizeof(subject), &crt->subject);
+	issuer_len = mbedtls_x509_dn_gets(issuer, sizeof(issuer), &crt->issuer);
+	if (subject_len < 0)
+		os_strlcpy(subject, "<error>", sizeof(subject));
+	if (issuer_len < 0)
+		os_strlcpy(issuer, "<error>", sizeof(issuer));
+	if (!tls_mbedtls_peer_serial_num(crt, serial, sizeof(serial)))
+		os_strlcpy(serial, "<error>", sizeof(serial));
+	wpa_printf(MSG_INFO,
+		   "mtls: certificate name=%s subject='%s' issuer='%s' serial=%s "
+		   "key_type=%d valid=%s",
+		   name, subject, issuer, serial, mbedtls_pk_get_type(&crt->pk),
+		   mbedtls_x509_time_is_future(&crt->valid_from) ||
+		   mbedtls_x509_time_is_past(&crt->valid_to) ? "no" : "yes");
+}
+
 
 static int tls_mbedtls_set_crl(struct tls_conf *tls_conf, const u8 *data, size_t len)
 {
@@ -1422,6 +1448,8 @@ static int tls_mbedtls_set_ca_and_crl(struct tls_conf *tls_conf, const char *ca_
 
 	forced_memzero(data, len);
 	os_free(data);
+	if (rc == 0)
+		tls_mbedtls_log_cert("ca", &tls_conf->ca_cert);
 	return rc;
 }
 
@@ -1586,6 +1614,7 @@ static int tls_mbedtls_set_certs(struct tls_conf *tls_conf,
 				emsg(MSG_WARNING, params->client_cert);
 		}
 		tls_conf->has_client_cert = 1;
+		tls_mbedtls_log_cert("client", &tls_conf->client_cert);
 	}
 
 	if (params->private_key || params->private_key_blob) {
@@ -1621,6 +1650,8 @@ static int tls_mbedtls_set_certs(struct tls_conf *tls_conf,
 			return -1;
 		}
 		tls_conf->has_private_key = 1;
+		wpa_printf(MSG_INFO, "mtls: private_key loaded key_type=%d",
+			   mbedtls_pk_get_type(&tls_conf->private_key));
 	}
 
 	if (tls_conf->has_client_cert && tls_conf->has_private_key) {
@@ -1630,6 +1661,7 @@ static int tls_mbedtls_set_certs(struct tls_conf *tls_conf,
 			elog(ret, "mbedtls_ssl_conf_own_cert");
 			return -1;
 		}
+		wpa_printf(MSG_INFO, "mtls: client_cert and private_key configured");
 	}
 
 	return 0;
@@ -1783,7 +1815,8 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf,
 			};
 
 			wpa_printf(MSG_DEBUG,
-				   "MTLS: GOST certificate - enable GOST cipher suite");
+				   "mtls: gost certificate, enable cipher_suite=0x%04x",
+				   MBEDTLS_TLS_GOSTR341112_256_WITH_KUZNYECHIK_CTR_OMAC);
 			if (!tls_mbedtls_set_ciphersuites(tls_conf,
 							gost_ciphersuites, 2))
 				return -1;
@@ -1807,6 +1840,13 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
 {
 	if (conn == NULL || params == NULL)
 		return -1;
+	wpa_printf(MSG_INFO,
+		   "mtls: set_params client_cert=%s private_key=%s ca_cert=%s "
+		   "domain_match=%s",
+		   params->client_cert ? params->client_cert : "<none>",
+		   params->private_key ? params->private_key : "<none>",
+		   params->ca_cert ? params->ca_cert : "<none>",
+		   params->domain_match ? params->domain_match : "<none>");
 
 	tls_conf_deinit(conn->tls_conf);
 	struct tls_conf *tls_conf = conn->tls_conf = tls_conf_init(tls_ctx);
@@ -2034,6 +2074,8 @@ static void tls_connection_export_keys_cb(
 	          client_random, MBEDTLS_EXPKEY_RAND_LEN);
 	os_memcpy(conn->expkey_randbytes + MBEDTLS_EXPKEY_RAND_LEN,
 	          server_random, MBEDTLS_EXPKEY_RAND_LEN);
+	wpa_printf(MSG_INFO, "mtls: key material exported prf=%d secret_len=%zu",
+		   tls_prf_type, secret_len);
 }
 #elif MBEDTLS_VERSION_NUMBER >= 0x02120000 /* mbedtls 2.18.0 */
 static int tls_connection_export_keys_cb(
@@ -2058,6 +2100,8 @@ static int tls_connection_export_keys_cb(
 	          client_random, MBEDTLS_EXPKEY_RAND_LEN);
 	os_memcpy(conn->expkey_randbytes + MBEDTLS_EXPKEY_RAND_LEN,
 	          server_random, MBEDTLS_EXPKEY_RAND_LEN);
+	wpa_printf(MSG_INFO, "mtls: key material exported prf=%d keyblock_size=%zu",
+		   tls_prf_type, conn->expkey_keyblock_size);
 	return 0;
 }
 #endif
@@ -2082,12 +2126,15 @@ int tls_connection_export_key(void *tls_ctx, struct tls_connection *conn,
 {
 	/* (EAP-PEAP EAP-TLS EAP-TTLS) */
   #if MBEDTLS_VERSION_NUMBER >= 0x02120000 /* mbedtls 2.18.0 */
-	return (conn && conn->established && conn->tls_prf_type)
+	int ret = (conn && conn->established && conn->tls_prf_type)
 	  ? mbedtls_ssl_tls_prf(conn->tls_prf_type,
 				conn->expkey_secret, conn->expkey_secret_len, label,
 				conn->expkey_randbytes,
 				sizeof(conn->expkey_randbytes), out, out_len)
 	  : -1;
+	wpa_printf(MSG_INFO, "mtls: export_key label='%s' context_len=%zu out_len=%zu result=%d",
+		   label ? label : "<none>", context_len, out_len, ret);
+	return ret;
   #else
 	/* not implemented here for mbedtls < 2.18.0 */
 	return -1;
@@ -2283,6 +2330,8 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
   #endif
 
   #if MBEDTLS_VERSION_NUMBER >= 0x03020000 /* mbedtls 3.2.0 */
+	wpa_printf(MSG_INFO, "mtls: handshake input=%zu established=%d",
+		   in_data ? wpabuf_len(in_data) : 0, conn->established);
 	int ret = mbedtls_ssl_handshake(&conn->ssl);
   #else
 	int ret = 0;
@@ -2306,9 +2355,9 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
 		  const char *suite = mbedtls_ssl_get_ciphersuite(&conn->ssl);
 		  int suite_id = mbedtls_ssl_get_ciphersuite_id(suite);
 
-		  wpa_printf(MSG_DEBUG,
-			     "MTLS: Server selected cipher suite 0x%04x",
-			     suite_id);
+			wpa_printf(MSG_INFO, "mtls: handshake complete version=%s "
+			           "cipher_suite=0x%04x",
+			           mbedtls_ssl_get_version(&conn->ssl), suite_id);
 		}
 		conn->established = 1;
 		if (conn->push_buf == NULL)
@@ -2358,6 +2407,8 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
 
 	struct wpabuf *out_data = conn->push_buf;
 	conn->push_buf = NULL;
+	wpa_printf(MSG_INFO, "mtls: handshake result=%d output=%zu established=%d failed=%d",
+		   ret, out_data ? wpabuf_len(out_data) : 0, conn->established, conn->failed);
 	return out_data;
 }
 
@@ -3276,6 +3327,17 @@ tls_mbedtls_verify_cb (void *arg, mbedtls_x509_crt *crt, int depth, uint32_t *fl
 		*flags &= ~MBEDTLS_X509_BADCERT_FUTURE;
 	}
 
+	{
+		char subject[512];
+		int subject_len = mbedtls_x509_dn_gets(subject, sizeof(subject),
+		                                      &crt->subject);
+		if (subject_len < 0)
+			os_strlcpy(subject, "<error>", sizeof(subject));
+		wpa_printf(MSG_INFO,
+			   "mtls: certificate verify depth=%d subject='%s' flags=0x%08x "
+			   "result=%s",
+			   depth, subject, (unsigned int)*flags, *flags ? "fail" : "ok");
+	}
 	tls_mbedtls_verify_cert_event(conn, crt, depth);
 
 	if (*flags) {
