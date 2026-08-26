@@ -590,6 +590,8 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
     return -1;
   }
   conn->server_name = os_strdup(params->domain_match);
+  wpa_printf(MSG_INFO, "CryptoPro: server_name match configured: expected=%s",
+             conn->server_name);
   if (!conn->server_name || load_ca_store(conn, params->ca_cert)) {
     wpa_printf(MSG_INFO, "CryptoPro: failed to load ca_cert");
     return -1;
@@ -728,14 +730,17 @@ static int verify_server_cert(struct tls_connection *conn)
     goto out;
   }
 
-  if (!CertGetNameStringA(remote, CERT_NAME_DNS_TYPE, 0, NULL, dns,
-                          sizeof(dns)) ||
-      os_strcasecmp(dns, conn->server_name)) {
-    wpa_printf(MSG_INFO, "CryptoPro: server certificate name mismatch");
+  dns[0] = '\0';
+  CertGetNameStringA(remote, CERT_NAME_DNS_TYPE, 0, NULL, dns, sizeof(dns));
+  wpa_printf(MSG_INFO, "CryptoPro: server_name match: expected=%s, certificate_dns=%s",
+             conn->server_name, dns[0] ? dns : "<none>");
+  if (!dns[0] || os_strcasecmp(dns, conn->server_name)) {
+    wpa_printf(MSG_INFO, "CryptoPro: server certificate name mismatch: expected=%s, "
+               "certificate_dns=%s", conn->server_name, dns[0] ? dns : "<none>");
     goto out;
   }
 
-  wpa_printf(MSG_INFO, "CryptoPro: server certificate verified");
+  wpa_printf(MSG_INFO, "CryptoPro: server certificate verified: server_name match");
   ret = 0;
 
 out:
