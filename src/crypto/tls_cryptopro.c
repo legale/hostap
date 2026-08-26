@@ -31,6 +31,7 @@ struct tls_connection {
   struct tls_context *ctx;
   PCCERT_CONTEXT cert;
   HCERTSTORE ca_store;
+  HCERTSTORE root_store;
   CredHandle cred;
   CtxtHandle ctxt;
   int have_cred;
@@ -99,14 +100,15 @@ static PCCERT_CONTEXT find_cert(const u8 wanted[CSP_CERT_HASH_LEN])
   PCCERT_CONTEXT found = NULL;
 
   store = CertOpenSystemStoreA(0, "MY");
-  if (!store)
+  if (!store) {
+    wpa_printf(MSG_INFO, "CryptoPro: open MY store failed: 0x%08lx",
+               (unsigned long) GetLastError());
     return NULL;
+  }
+  wpa_printf(MSG_INFO, "CryptoPro: searching MY store for requested client cert");
 
   while ((cert = CertEnumCertificatesInStore(store, cert))) {
-    HCRYPTPROV_OR_NCRYPT_KEY_HANDLE key;
-    DWORD key_spec;
     DWORD hash_len = CSP_CERT_HASH_LEN;
-    BOOL free_key;
     u8 hash[CSP_CERT_HASH_LEN];
 
     if (!CertGetCertificateContextProperty(cert, CERT_SHA1_HASH_PROP_ID,
@@ -115,16 +117,11 @@ static PCCERT_CONTEXT find_cert(const u8 wanted[CSP_CERT_HASH_LEN])
         os_memcmp(hash, wanted, sizeof(hash)))
       continue;
 
-    if (CertVerifyTimeValidity(NULL, cert->pCertInfo) != 0)
+    if (CertVerifyTimeValidity(NULL, cert->pCertInfo) != 0) {
+      wpa_printf(MSG_INFO, "CryptoPro: requested client cert is expired");
       break;
+    }
 
-    if (!CryptAcquireCertificatePrivateKey(
-          cert, CRYPT_ACQUIRE_COMPARE_KEY_FLAG | CRYPT_ACQUIRE_SILENT_FLAG,
-          NULL, &key, &key_spec, &free_key))
-      break;
-
-    if (free_key)
-      CryptReleaseContext((HCRYPTPROV) key, 0);
     found = CertDuplicateCertificateContext(cert);
     break;
   }
@@ -132,7 +129,157 @@ static PCCERT_CONTEXT find_cert(const u8 wanted[CSP_CERT_HASH_LEN])
   if (cert)
     CertFreeCertificateContext(cert);
   CertCloseStore(store, 0);
+  wpa_printf(MSG_INFO, "CryptoPro: client cert store search result: %s",
+             found ? "found" : "not found");
   return found;
+}
+
+static int set_certificate_pin(PCCERT_CONTEXT cert, const char *pin)
+{
+  DWORD info_len = 0;
+  PCRYPT_KEY_PROV_INFO info;
+  CRYPT_KEY_PROV_INFO updated;
+  CRYPT_KEY_PROV_PARAM param;
+  BOOL ok;
+
+  if (!pin) {
+    wpa_printf(MSG_INFO, "CryptoPro: client certificate PIN not configured");
+    return 0;
+  }
+  if (!CertGetCertificateContextProperty(cert, CERT_KEY_PROV_INFO_PROP_ID,
+                                         NULL, &info_len))
+    return -1;
+  info = os_malloc(info_len);
+  if (!info || !CertGetCertificateContextProperty(cert,
+      CERT_KEY_PROV_INFO_PROP_ID, info, &info_len)) {
+    os_free(info);
+    return -1;
+  }
+  os_memset(&param, 0, sizeof(param));
+  param.dwParam = info->dwKeySpec == AT_SIGNATURE ? PP_SIGNATURE_PIN :
+                  PP_KEYEXCHANGE_PIN;
+  param.pbData = (BYTE *) pin;
+  param.cbData = os_strlen(pin) + 1;
+  updated = *info;
+  updated.cProvParam = 1;
+  updated.rgProvParam = &param;
+  ok = CertSetCertificateContextProperty(cert, CERT_KEY_PROV_INFO_PROP_ID,
+                                         0, &updated);
+  os_free(info);
+  wpa_printf(MSG_INFO, "CryptoPro: client certificate PIN property: %s",
+             ok ? "set" : "failed");
+  return ok ? 0 : -1;
+}
+
+static void log_certificate_details(PCCERT_CONTEXT cert)
+{
+  char subject[256];
+  DWORD info_len = 0;
+  PCRYPT_KEY_PROV_INFO info = NULL;
+  HCRYPTPROV_OR_NCRYPT_KEY_HANDLE key = 0;
+  HCRYPTKEY exchange_key = 0;
+  BOOL free_key = FALSE;
+  DWORD key_spec = 0;
+
+  subject[0] = '\0';
+  CertGetNameStringA(cert, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL,
+                     subject, sizeof(subject));
+  wpa_printf(MSG_INFO, "CryptoPro: client cert subject=%s", subject);
+
+  if (CertGetCertificateContextProperty(cert, CERT_KEY_PROV_INFO_PROP_ID,
+                                        NULL, &info_len)) {
+    info = os_malloc(info_len);
+    if (info && CertGetCertificateContextProperty(cert,
+        CERT_KEY_PROV_INFO_PROP_ID, info, &info_len)) {
+      wpa_printf(MSG_INFO,
+                 "CryptoPro: cert provider=%ls type=%lu key_spec=%lu",
+                 info->pwszProvName ? info->pwszProvName : L"(none)",
+                 (unsigned long) info->dwProvType,
+                 (unsigned long) info->dwKeySpec);
+    }
+  }
+
+  if (!CryptAcquireCertificatePrivateKey(cert, CRYPT_ACQUIRE_SILENT_FLAG,
+                                         NULL, &key, &key_spec, &free_key)) {
+    wpa_printf(MSG_INFO,
+               "CryptoPro: private key acquire failed: 0x%08lx",
+               (unsigned long) GetLastError());
+    os_free(info);
+    return;
+  }
+
+  wpa_printf(MSG_INFO, "CryptoPro: private key acquired key_spec=%lu",
+             (unsigned long) key_spec);
+  if (CryptGetUserKey((HCRYPTPROV) key, AT_KEYEXCHANGE, &exchange_key)) {
+    wpa_printf(MSG_INFO, "CryptoPro: exchange key: available");
+    CryptDestroyKey(exchange_key);
+  } else {
+    wpa_printf(MSG_INFO, "CryptoPro: exchange key: unavailable, error=0x%08lx",
+               (unsigned long) GetLastError());
+  }
+  if (free_key)
+    CryptReleaseContext((HCRYPTPROV) key, 0);
+  os_free(info);
+}
+
+static int bind_certificate_provider(PCCERT_CONTEXT cert)
+{
+  HCRYPTPROV_OR_NCRYPT_KEY_HANDLE key = 0;
+  DWORD key_spec = 0;
+  BOOL free_key = FALSE;
+  DWORD info_len = 0;
+  PCRYPT_KEY_PROV_INFO info = NULL;
+  CRYPT_KEY_PROV_INFO updated;
+  DWORD name_len = 0;
+  char *provider_a = NULL;
+  wchar_t *provider = NULL;
+  int ret = -1;
+  DWORD i;
+
+  if (!CryptAcquireCertificatePrivateKey(cert,
+      CRYPT_ACQUIRE_COMPARE_KEY_FLAG | CRYPT_ACQUIRE_SILENT_FLAG,
+      NULL, &key, &key_spec, &free_key))
+    goto out;
+  if (!CertGetCertificateContextProperty(cert, CERT_KEY_PROV_INFO_PROP_ID,
+                                         NULL, &info_len))
+    goto out;
+  info = os_malloc(info_len);
+  if (!info || !CertGetCertificateContextProperty(cert,
+      CERT_KEY_PROV_INFO_PROP_ID, info, &info_len))
+    goto out;
+  if (!CryptGetProvParam((HCRYPTPROV) key, PP_NAME, NULL, &name_len, 0) ||
+      !name_len)
+    goto out;
+  provider_a = os_malloc(name_len);
+  if (!provider_a || !CryptGetProvParam((HCRYPTPROV) key, PP_NAME,
+      (BYTE *) provider_a, &name_len, 0))
+    goto out;
+  provider = os_malloc(name_len * sizeof(*provider));
+  if (!provider)
+    goto out;
+  for (i = 0; i < name_len; i++)
+    provider[i] = (wchar_t) (unsigned char) provider_a[i];
+
+  updated = *info;
+  updated.pwszProvName = provider;
+  updated.dwKeySpec = key_spec;
+  if (!CertSetCertificateContextProperty(cert, CERT_KEY_PROV_INFO_PROP_ID,
+                                          0, &updated))
+    goto out;
+  wpa_printf(MSG_INFO, "CryptoPro: certificate bound to provider=%ls",
+             provider);
+  ret = 0;
+
+out:
+  if (ret)
+    wpa_printf(MSG_INFO, "CryptoPro: certificate provider binding failed: "
+               "0x%08lx", (unsigned long) GetLastError());
+  os_free(provider);
+  os_free(provider_a);
+  os_free(info);
+  if (free_key)
+    CryptReleaseContext((HCRYPTPROV) key, 0);
+  return ret;
 }
 
 static int read_file(const char *path, u8 **data, DWORD *data_len)
@@ -176,6 +323,8 @@ static int load_ca_store(struct tls_connection *conn, const char *path)
   u8 *der = NULL;
   int ret = -1;
 
+  wpa_printf(MSG_INFO, "CryptoPro: loading CA certificate: %s",
+             path ? path : "(null)");
   if (!path || read_file(path, &file, &file_len))
     goto out;
 
@@ -209,8 +358,12 @@ static int load_ca_store(struct tls_connection *conn, const char *path)
     goto out;
 
   ret = 0;
+  wpa_printf(MSG_INFO, "CryptoPro: CA certificate loaded into memory store");
 
 out:
+  if (ret)
+    wpa_printf(MSG_INFO, "CryptoPro: CA certificate load failed: 0x%08lx",
+               (unsigned long) GetLastError());
   if (cert)
     CertFreeCertificateContext(cert);
   os_free(der);
@@ -281,10 +434,17 @@ static int acquire_credentials(struct tls_connection *conn)
   sc.dwVersion = SCHANNEL_CRED_VERSION;
   sc.cCreds = 1;
   sc.paCred = &conn->cert;
-  sc.hRootStore = conn->ca_store;
+  conn->root_store = CertOpenSystemStoreA(0, "ROOT");
+  if (!conn->root_store) {
+    wpa_printf(MSG_INFO, "CryptoPro: open ROOT store failed: 0x%08lx",
+               (unsigned long) GetLastError());
+    return -1;
+  }
+  wpa_printf(MSG_INFO, "CryptoPro: using system ROOT store for SSPI");
+  sc.hRootStore = conn->root_store;
   sc.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
-  sc.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS |
-               SCH_CRED_MEMORY_STORE_CERT;
+  sc.dwFlags = SCH_CRED_AUTO_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS;
+  wpa_printf(MSG_INFO, "CryptoPro: acquiring outbound SSPI credentials");
 
   status = conn->ctx->sspi->AcquireCredentialsHandleA(
     NULL, UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL, &sc, NULL, NULL,
@@ -295,6 +455,7 @@ static int acquire_credentials(struct tls_connection *conn)
   }
 
   conn->have_cred = 1;
+  wpa_printf(MSG_INFO, "CryptoPro: outbound SSPI credentials acquired");
   return 0;
 }
 
@@ -359,6 +520,8 @@ void tls_connection_deinit(void *tls_ctx, struct tls_connection *conn)
     CertFreeCertificateContext(conn->cert);
   if (conn->ca_store)
     CertCloseStore(conn->ca_store, 0);
+  if (conn->root_store)
+    CertCloseStore(conn->root_store, 0);
   os_free(conn->server_name);
   bin_clear_free(conn, sizeof(*conn));
 }
@@ -400,12 +563,13 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
     wpa_printf(MSG_INFO, "CryptoPro: invalid certificate reference");
     return -1;
   }
+  wpa_printf(MSG_INFO, "CryptoPro: configuring client TLS parameters");
   if (os_strcmp(params->client_cert, params->private_key)) {
     wpa_printf(MSG_INFO, "CryptoPro: client_cert and private_key differ");
     return -1;
   }
-  if (params->pin || params->private_key_passwd) {
-    wpa_printf(MSG_INFO, "CryptoPro: PIN input is not supported");
+  if (params->pin) {
+    wpa_printf(MSG_INFO, "CryptoPro: pin is not supported");
     return -1;
   }
   if (!params->domain_match || os_strchr(params->domain_match, ';')) {
@@ -416,6 +580,13 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
   conn->cert = find_cert(cert_hash);
   if (!conn->cert) {
     wpa_printf(MSG_INFO, "CryptoPro: certificate with private key not found");
+    return -1;
+  }
+  log_certificate_details(conn->cert);
+  if (bind_certificate_provider(conn->cert))
+    return -1;
+  if (set_certificate_pin(conn->cert, params->private_key_passwd)) {
+    wpa_printf(MSG_INFO, "CryptoPro: failed to set certificate PIN");
     return -1;
   }
   conn->server_name = os_strdup(params->domain_match);
@@ -599,6 +770,10 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
   if (!conn || !conn->have_cred || conn->failed)
     return NULL;
 
+  wpa_printf(MSG_INFO, "CryptoPro: TLS handshake step: %s, input=%lu bytes",
+             conn->have_ctxt ? "continue" : "start",
+             (unsigned long) (in_data ? wpabuf_len(in_data) : 0));
+
   flags = ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT |
           ISC_REQ_CONFIDENTIALITY | ISC_RET_EXTENDED_ERROR |
           ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM;
@@ -633,6 +808,11 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
       &conn->cred, &conn->ctxt, NULL, flags, 0, SECURITY_NATIVE_DREP,
       &in_desc, 0, NULL, &out_desc, &out_flags, &expiry);
   }
+
+  wpa_printf(MSG_INFO, "CryptoPro: InitializeSecurityContext status=0x%08lx, "
+             "output=%lu bytes",
+             (unsigned long) status,
+             (unsigned long) out.cbBuffer);
 
   if ((status == SEC_I_COMPLETE_NEEDED ||
        status == SEC_I_COMPLETE_AND_CONTINUE) &&
