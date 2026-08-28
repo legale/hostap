@@ -28,6 +28,9 @@ const struct wpa_driver_ops *const wpa_drivers[] =
 #ifdef CONFIG_DRIVER_NDIS
 	&wpa_driver_ndis_ops,
 #endif /* CONFIG_DRIVER_NDIS */
+#ifdef CONFIG_DRIVER_WLANAPI
+	&wpa_driver_wlanapi_ops,
+#endif /* CONFIG_DRIVER_WLANAPI */
 #ifdef CONFIG_DRIVER_WIRED
 	&wpa_driver_wired_ops,
 #endif /* CONFIG_DRIVER_WIRED */

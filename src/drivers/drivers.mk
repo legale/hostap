@@ -94,12 +94,22 @@ DRV_WPA_OBJS += src/drivers/driver_ndis.c
 ifdef CONFIG_NDIS_EVENTS_INTEGRATED
 DRV_WPA_OBJS += src/drivers/driver_ndis_.c
 endif
+
 ifndef CONFIG_L2_PACKET
 CONFIG_L2_PACKET=pcap
 endif
 CONFIG_WINPCAP=y
 ifdef CONFIG_USE_NDISUIO
 DRV_WPA_CFLAGS += -DCONFIG_USE_NDISUIO
+endif
+endif
+
+ifdef CONFIG_DRIVER_WLANAPI
+DRV_WPA_CFLAGS += -DCONFIG_DRIVER_WLANAPI
+DRV_WPA_OBJS += src/drivers/driver_wlanapi.c
+DRV_WPA_LIBS += -lwlanapi -lole32
+ifndef CONFIG_L2_PACKET
+CONFIG_L2_PACKET=winpcap
 endif
 endif
 

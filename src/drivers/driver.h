@@ -7973,6 +7973,9 @@ extern const struct wpa_driver_ops wpa_driver_openbsd_ops;
 #ifdef CONFIG_DRIVER_NDIS
 extern struct wpa_driver_ops wpa_driver_ndis_ops; /* driver_ndis.c */
 #endif /* CONFIG_DRIVER_NDIS */
+#ifdef CONFIG_DRIVER_WLANAPI
+extern const struct wpa_driver_ops wpa_driver_wlanapi_ops;
+#endif /* CONFIG_DRIVER_WLANAPI */
 #ifdef CONFIG_DRIVER_WIRED
 extern const struct wpa_driver_ops wpa_driver_wired_ops; /* driver_wired.c */
 #endif /* CONFIG_DRIVER_WIRED */
