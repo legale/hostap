@@ -117,6 +117,7 @@ static int wlanapi_scan(void *priv, struct wpa_driver_scan_params *params)
 	return eloop_register_timeout(4, 0, wlanapi_scan_timeout, drv, NULL);
 }
 
+/* Передаём Windows имя профиля; PSK-handshake выполняет WLAN stack. */
 static int wlanapi_associate(void *priv, struct wpa_driver_associate_params *params)
 {
 	struct wlanapi_data *drv = priv;
