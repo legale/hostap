@@ -15,7 +15,35 @@ struct wlanapi_data {
 	char ifname[IFNAMSIZ];
 	u8 mac[ETH_ALEN];
 	int mac_valid;
+	int notification_registered;
 };
+
+static void wlanapi_notification(PWLAN_NOTIFICATION_DATA data, PVOID ctx)
+{
+	struct wlanapi_data *drv = ctx;
+
+	if (!data || !drv ||
+		memcmp(&data->InterfaceGuid, &drv->guid, sizeof(GUID)) != 0 ||
+		data->NotificationSource != WLAN_NOTIFICATION_SOURCE_ACM)
+		return;
+
+	switch (data->NotificationCode) {
+	case wlan_notification_acm_connection_complete:
+		if (data->dwDataSize >= sizeof(WLAN_CONNECTION_NOTIFICATION_DATA) &&
+			data->pData) {
+			PWLAN_CONNECTION_NOTIFICATION_DATA conn = data->pData;
+
+			if (conn->wlanReasonCode == ERROR_SUCCESS)
+				wpa_supplicant_event(drv->ctx, EVENT_ASSOC, NULL);
+		}
+		break;
+	case wlan_notification_acm_disconnected:
+		wpa_supplicant_event(drv->ctx, EVENT_DEAUTH, NULL);
+		break;
+	default:
+		break;
+	}
+}
 
 static int wlanapi_guid_string(const GUID *guid, char *buf, size_t len)
 {
@@ -160,6 +188,29 @@ static int wlanapi_deauthenticate(void *priv, const u8 *addr, u16 reason_code)
 	return WlanDisconnect(drv->handle, &drv->guid, NULL) == ERROR_SUCCESS ? 0 : -1;
 }
 
+static int wlanapi_get_bssid(void *priv, u8 *bssid)
+{
+	struct wlanapi_data *drv = priv;
+	PWLAN_CONNECTION_ATTRIBUTES attrs = NULL;
+	DWORD size = 0, opcode, ret;
+
+	if (!bssid)
+		return -1;
+	opcode = wlan_intf_opcode_current_connection;
+	ret = WlanQueryInterface(drv->handle, &drv->guid, opcode, NULL, &size,
+					 (PVOID *) &attrs, NULL);
+	if (ret != ERROR_SUCCESS || !attrs ||
+		attrs->isState != wlan_interface_state_connected)
+		goto out;
+	os_memcpy(bssid, attrs->wlanAssociationAttributes.dot11Bssid,
+			  ETH_ALEN);
+	ret = ERROR_SUCCESS;
+out:
+	if (attrs)
+		WlanFreeMemory(attrs);
+	return ret == ERROR_SUCCESS ? 0 : -1;
+}
+
 static struct wpa_scan_results *
 wlanapi_get_scan_results(void *priv)
 {
@@ -231,6 +282,10 @@ static void * wlanapi_init(void *ctx, const char *ifname)
 		return NULL;
 	}
 	wlanapi_get_mac(drv);
+	ret = WlanRegisterNotification(drv->handle, WLAN_NOTIFICATION_SOURCE_ACM,
+					       FALSE, wlanapi_notification, drv, NULL, NULL);
+	if (ret == ERROR_SUCCESS)
+		drv->notification_registered = 1;
 	return drv;
 }
 
@@ -239,6 +294,9 @@ static void wlanapi_deinit(void *priv)
 	struct wlanapi_data *drv = priv;
 
 	eloop_cancel_timeout(wlanapi_scan_timeout, drv, NULL);
+	if (drv->notification_registered)
+		WlanRegisterNotification(drv->handle, WLAN_NOTIFICATION_SOURCE_NONE,
+					       FALSE, NULL, NULL, NULL, NULL);
 	WlanCloseHandle(drv->handle, NULL);
 	os_free(drv);
 }
@@ -312,6 +370,7 @@ const struct wpa_driver_ops wpa_driver_wlanapi_ops = {
 	.deinit = wlanapi_deinit,
 	.get_ifname = wlanapi_get_ifname,
 	.get_mac_addr = wlanapi_get_mac_addr,
+	.get_bssid = wlanapi_get_bssid,
 	.scan2 = wlanapi_scan,
 	.get_scan_results2 = wlanapi_get_scan_results,
 	.associate = wlanapi_associate,
