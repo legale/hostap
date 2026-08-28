@@ -1,6 +1,7 @@
 /* WPA Supplicant - Windows WLAN API driver interface */
 
 #include "includes.h"
+#include <iphlpapi.h>
 #include <wlanapi.h>
 
 #include "common.h"
@@ -12,6 +13,8 @@ struct wlanapi_data {
 	HANDLE handle;
 	GUID guid;
 	char ifname[IFNAMSIZ];
+	u8 mac[ETH_ALEN];
+	int mac_valid;
 };
 
 static int wlanapi_guid_string(const GUID *guid, char *buf, size_t len)
@@ -46,7 +49,8 @@ static int wlanapi_find_interface(struct wlanapi_data *drv, const char *ifname)
 		if (os_strcasecmp(ifname, guid) == 0 ||
 			os_strcasecmp(ifname, desc) == 0) {
 			drv->guid = iface->InterfaceGuid;
-			os_strlcpy(drv->ifname, guid, sizeof(drv->ifname));
+			os_snprintf(drv->ifname, sizeof(drv->ifname),
+				    "\\Device\\NPF_%s", guid);
 			WlanFreeMemory(list);
 			return 0;
 		}
@@ -54,6 +58,29 @@ static int wlanapi_find_interface(struct wlanapi_data *drv, const char *ifname)
 
 	WlanFreeMemory(list);
 	return -1;
+}
+
+static void wlanapi_get_mac(struct wlanapi_data *drv)
+{
+	IP_ADAPTER_INFO *addrs, *item;
+	ULONG len = 15000;
+	char guid[64];
+
+	addrs = os_malloc(len);
+	if (addrs == NULL || wlanapi_guid_string(&drv->guid, guid, sizeof(guid)) < 0)
+		goto out;
+	if (GetAdaptersInfo(addrs, &len) != NO_ERROR)
+		goto out;
+	for (item = addrs; item; item = item->Next) {
+		if (os_strcasecmp(item->AdapterName, guid) != 0 ||
+			item->AddressLength != ETH_ALEN)
+			continue;
+		os_memcpy(drv->mac, item->Address, ETH_ALEN);
+		drv->mac_valid = 1;
+		break;
+	}
+out:
+	os_free(addrs);
 }
 
 static void wlanapi_scan_timeout(void *eloop_ctx, void *timeout_ctx)
@@ -88,6 +115,48 @@ static int wlanapi_scan(void *priv, struct wpa_driver_scan_params *params)
 
 	eloop_cancel_timeout(wlanapi_scan_timeout, drv, NULL);
 	return eloop_register_timeout(4, 0, wlanapi_scan_timeout, drv, NULL);
+}
+
+static int wlanapi_associate(void *priv, struct wpa_driver_associate_params *params)
+{
+	struct wlanapi_data *drv = priv;
+	WLAN_CONNECTION_PARAMETERS conn;
+	DOT11_SSID ssid;
+	WCHAR profile[WLAN_MAX_NAME_LENGTH];
+	DWORD ret;
+
+	if (!params || !params->ssid || params->ssid_len == 0 ||
+		params->ssid_len > DOT11_SSID_MAX_LENGTH)
+		return -1;
+	if (MultiByteToWideChar(CP_UTF8, 0, (const char *) params->ssid,
+				(int) params->ssid_len, profile,
+				ARRAY_SIZE(profile) - 1) == 0)
+		return -1;
+	profile[params->ssid_len] = L'\0';
+	os_memset(&ssid, 0, sizeof(ssid));
+	ssid.uSSIDLength = params->ssid_len;
+	os_memcpy(ssid.ucSSID, params->ssid, params->ssid_len);
+	os_memset(&conn, 0, sizeof(conn));
+	conn.wlanConnectionMode = wlan_connection_mode_profile;
+	conn.strProfile = profile;
+	conn.pDot11Ssid = &ssid;
+	conn.dot11BssType = dot11_BSS_type_infrastructure;
+	ret = WlanConnect(drv->handle, &drv->guid, &conn, NULL);
+	if (ret != ERROR_SUCCESS) {
+		wpa_printf(MSG_ERROR, "WLANAPI: WlanConnect failed: %lu",
+			   (unsigned long) ret);
+		return -1;
+	}
+	return 0;
+}
+
+static int wlanapi_deauthenticate(void *priv, const u8 *addr, u16 reason_code)
+{
+	struct wlanapi_data *drv = priv;
+
+	(void) addr;
+	(void) reason_code;
+	return WlanDisconnect(drv->handle, &drv->guid, NULL) == ERROR_SUCCESS ? 0 : -1;
 }
 
 static struct wpa_scan_results *
@@ -160,6 +229,7 @@ static void * wlanapi_init(void *ctx, const char *ifname)
 		os_free(drv);
 		return NULL;
 	}
+	wlanapi_get_mac(drv);
 	return drv;
 }
 
@@ -178,6 +248,13 @@ static int wlanapi_get_ifname(void *priv, char *buf, size_t len)
 
 	os_strlcpy(buf, drv->ifname, len);
 	return 0;
+}
+
+static const u8 *wlanapi_get_mac_addr(void *priv)
+{
+	struct wlanapi_data *drv = priv;
+
+	return drv->mac_valid ? drv->mac : NULL;
 }
 
 static struct wpa_interface_info *wlanapi_get_interfaces(void *global_priv)
@@ -233,7 +310,10 @@ const struct wpa_driver_ops wpa_driver_wlanapi_ops = {
 	.init = wlanapi_init,
 	.deinit = wlanapi_deinit,
 	.get_ifname = wlanapi_get_ifname,
+	.get_mac_addr = wlanapi_get_mac_addr,
 	.scan2 = wlanapi_scan,
 	.get_scan_results2 = wlanapi_get_scan_results,
+	.associate = wlanapi_associate,
+	.deauthenticate = wlanapi_deauthenticate,
 	.get_interfaces = wlanapi_get_interfaces,
 };
