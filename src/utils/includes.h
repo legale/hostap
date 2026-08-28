@@ -41,6 +41,9 @@
 #include <sys/uio.h>
 #include <sys/time.h>
 #endif /* __vxworks */
+#else /* CONFIG_NATIVE_WINDOWS */
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #endif /* CONFIG_NATIVE_WINDOWS */
 
 #endif /* INCLUDES_H */

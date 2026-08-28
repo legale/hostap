@@ -576,8 +576,13 @@ endif
 endif
 
 ifeq ($(CONFIG_L2_PACKET), winpcap)
+ifdef WINPCAP_LIBS
+LIBS += $(WINPCAP_LIBS)
+LIBS_w += $(WINPCAP_LIBS)
+else
 LIBS += -lwpcap -lpacket
 LIBS_w += -lwpcap
+endif
 endif
 
 ifeq ($(CONFIG_L2_PACKET), freebsd)
