@@ -1,9 +1,9 @@
 # hostapd
 
-GOST-сборка выполняется из корня `wnam2-gost`:
+Демон точки доступа и authenticator 802.1X. Для GOST нужны `libnl`, выбранный
+TLS backend и соответствующий `.config`.
 
 ```sh
-make -C gost-eap-tls -j2 TLS=mbedtls hostap
-make -C gost-eap-tls -j2 TLS=openssl hostap
-make -C gost-eap-tls hostap-cpro
+cp defconfig .config
+make -j2
 ```

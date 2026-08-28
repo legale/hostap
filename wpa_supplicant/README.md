@@ -1,10 +1,11 @@
 # wpa_supplicant
 
-GOST-сборка выполняется из корня `wnam2-gost`:
+Клиент Wi-Fi и wired 802.1X. Для GOST нужны `libnl`, выбранный TLS backend и
+соответствующий `.config`.
 
 ```sh
-make -C gost-eap-tls -j2 CC=gcc TLS=mbedtls test-wired
-make -C gost-eap-tls -j2 CC=gcc TLS=openssl test-wired
-make -C gost-eap-tls -j2 CC=musl-gcc TLS=mbedtls test-wired
-make -C gost-eap-tls -j2 CC=musl-gcc TLS=openssl test-wired
+cp defconfig .config
+make -j2
 ```
+
+Для CryptoPro нужен CryptoPro CSP, `lsb-cprocsp-devel` и glibc-компилятор.
