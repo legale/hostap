@@ -388,7 +388,7 @@ out:
   return ret;
 }
 
-static int read_file(const char *path, u8 **data, DWORD *data_len)
+static int read_file(const char *path, u8 **data, size_t *data_len)
 {
   FILE *f;
   long len;
@@ -416,7 +416,7 @@ static int read_file(const char *path, u8 **data, DWORD *data_len)
   fclose(f);
   buf[len] = '\0';
   *data = buf;
-  *data_len = (DWORD) len;
+  *data_len = (size_t) len;
   return 0;
 }
 
@@ -427,65 +427,73 @@ struct cpro_key_config {
 
 static void parse_cpro_key_file(const char *path, struct cpro_key_config *cfg)
 {
-        char *data, *tmp, *line, *save;
-        DWORD len;
-        int cpro = 0;
+  char *data, *tmp, *line, *save;
+  size_t len;
+  int in_cpro_section = 0;
 
-        os_memset(cfg, 0, sizeof(*cfg));
+  os_memset(cfg, 0, sizeof(*cfg));
 
-        if (!path || read_file(path, (u8 **)&data, &len)) {
-                return;
-        }
+  if (!path || read_file(path, (u8 **)&data, &len))
+    return;
 
-        tmp = os_realloc(data, len + 1);
-        if (!tmp) {
-                os_free(data);
-                return;
-        }
+  /* Безопасный реаллок */
+  tmp = os_realloc(data, len + 1);
+  if (!tmp) {
+    os_free(data);
+    return;
+  }
 
-        data = tmp;
-        data[len] = '\0';
+  data = tmp;
+  data[len] = '\0';
 
-        for (line = strtok_r(data, "\r\n", &save);
-             line;
-             line = strtok_r(NULL, "\r\n", &save)) {
-                char *eq, *val;
+  for (line = strtok_r(data, "\r\n", &save); line; line = strtok_r(NULL, "\r\n", &save)) {
+    char *eq, *val;
 
-                if (!cpro) {
-                        cpro = !os_strcmp(line, "cpro");
-                        continue;
-                }
+    /* Пропускаем всё до нужной секции */
+    if (!in_cpro_section) {
+      if (os_strcmp(line, "cpro") == 0)
+        in_cpro_section = 1;
+      continue;
+    }
 
-                if (!os_strncmp(line, "-----", 5)) {
-                        break;
-                }
+    /* Конец секции ключа */
+    if (os_strncmp(line, "-----", 5) == 0)
+      break;
 
-                eq = os_strchr(line, '=');
-                if (!eq) {
-                        continue;
-                }
+    eq = os_strchr(line, '=');
+    if (!eq)
+      continue;
 
-                *eq++ = '\0';
-                val = eq;
+    *eq = '\0';
+    val = eq + 1;
 
-                while (*val == ' ' || *val == '\t') {
-                        val++;
-                }
+    /* Примитивный trim для ключа (отсекаем пробелы перед '=') */
+    {
+      char *key_end = eq - 1;
+      while (key_end >= line && (*key_end == ' ' || *key_end == '\t'))
+        *key_end-- = '\0';
+    }
 
-                if (!os_strcmp(line, "pin") && !cfg->pin) {
-                        cfg->pin = os_strdup(val);
-                } else if (!os_strcmp(line, "domain_match") &&
-                           !cfg->domain_match) {
-                        cfg->domain_match = os_strdup(val);
-                }
-        }
+    /* Trim ведущих пробелов для значения */
+    while (*val == ' ' || *val == '\t')
+      val++;
 
-        os_free(data);
+    /* Заполнение структуры */
+    if (os_strcmp(line, "pin") == 0 && !cfg->pin) {
+      cfg->pin = os_strdup(val);
+    } else if (os_strcmp(line, "domain_match") == 0 && !cfg->domain_match) {
+      cfg->domain_match = os_strdup(val);
+    }
+  }
+
+  /* Очищаем чувствительные данные перед освобождением памяти */
+  os_memset(data, 0, len + 1);
+  os_free(data);
 }
 
 static int get_cert_hash_from_file(const char *path, u8 hash[CSP_CERT_HASH_LEN])
 {
-  DWORD file_len = 0;
+  size_t file_len = 0;
   u8 *file = NULL;
   const char *pos;
   PCCERT_CONTEXT cert = NULL;
@@ -552,7 +560,7 @@ out:
 
 static int load_ca_store(struct tls_connection *conn, const char *path)
 {
-  DWORD file_len = 0;
+  size_t file_len = 0;
   u8 *file = NULL;
   const char *pos;
   int ret = -1;
