@@ -17,7 +17,8 @@
 #include <cpcsp/CSP_Sspi.h>
 #include <cpcsp/CSP_SChannel.h>
 
-#define CSP_CERT_PREFIX "csp:uMy:"
+#include <string.h>
+
 #define CSP_CERT_HASH_LEN 20
 #define GOST_TLS12_SUITE 0xc100
 
@@ -52,45 +53,20 @@ struct tls_connection {
 static void csp_error(struct tls_connection *conn, const char *op,
                       SECURITY_STATUS status)
 {
-  wpa_printf(MSG_INFO, "CryptoPro: %s failed: 0x%08lx", op,
+  wpa_printf(MSG_INFO, "CryptoPro: event=error op='%s' status=0x%08lx", op,
              (unsigned long) status);
   conn->failed = 1;
   conn->ctx->errors++;
 }
 
-static int hex_value(char c)
+static void format_hex(const u8 *bin, size_t len, char *out, size_t out_len)
 {
-  if (c >= '0' && c <= '9')
-    return c - '0';
-  if (c >= 'a' && c <= 'f')
-    return c - 'a' + 10;
-  if (c >= 'A' && c <= 'F')
-    return c - 'A' + 10;
-  return -1;
-}
-
-static int parse_cert_id(const char *id, u8 hash[CSP_CERT_HASH_LEN])
-{
-  const char *pos;
   size_t i;
-
-  if (!id || os_strncmp(id, CSP_CERT_PREFIX, os_strlen(CSP_CERT_PREFIX)))
-    return -1;
-
-  pos = id + os_strlen(CSP_CERT_PREFIX);
-  if (os_strlen(pos) != CSP_CERT_HASH_LEN * 2)
-    return -1;
-
-  for (i = 0; i < CSP_CERT_HASH_LEN; i++) {
-    int hi = hex_value(pos[i * 2]);
-    int lo = hex_value(pos[i * 2 + 1]);
-
-    if (hi < 0 || lo < 0)
-      return -1;
-    hash[i] = (u8) ((hi << 4) | lo);
-  }
-
-  return 0;
+  if (out_len < len * 2 + 1)
+    return;
+  for (i = 0; i < len; i++)
+    os_snprintf(out + i * 2, 3, "%02x", bin[i]);
+  out[len * 2] = '\0';
 }
 
 static PCCERT_CONTEXT find_cert(const u8 wanted[CSP_CERT_HASH_LEN])
@@ -98,14 +74,18 @@ static PCCERT_CONTEXT find_cert(const u8 wanted[CSP_CERT_HASH_LEN])
   HCERTSTORE store;
   PCCERT_CONTEXT cert = NULL;
   PCCERT_CONTEXT found = NULL;
+  char wanted_hex[CSP_CERT_HASH_LEN * 2 + 1];
+
+  format_hex(wanted, CSP_CERT_HASH_LEN, wanted_hex, sizeof(wanted_hex));
 
   store = CertOpenSystemStoreA(0, "MY");
   if (!store) {
-    wpa_printf(MSG_INFO, "CryptoPro: open MY store failed: 0x%08lx",
+    wpa_printf(MSG_INFO, "CryptoPro: event=open_store store=MY status=failed error=0x%08lx",
                (unsigned long) GetLastError());
     return NULL;
   }
-  wpa_printf(MSG_INFO, "CryptoPro: searching MY store for requested client cert");
+  wpa_printf(MSG_INFO, "CryptoPro: event=search_store store=MY wanted_thumbprint=%s",
+             wanted_hex);
 
   while ((cert = CertEnumCertificatesInStore(store, cert))) {
     DWORD hash_len = CSP_CERT_HASH_LEN;
@@ -118,7 +98,8 @@ static PCCERT_CONTEXT find_cert(const u8 wanted[CSP_CERT_HASH_LEN])
       continue;
 
     if (CertVerifyTimeValidity(NULL, cert->pCertInfo) != 0) {
-      wpa_printf(MSG_INFO, "CryptoPro: requested client cert is expired");
+      wpa_printf(MSG_INFO, "CryptoPro: event=check_cert status=expired thumbprint=%s",
+                 wanted_hex);
       break;
     }
 
@@ -129,8 +110,8 @@ static PCCERT_CONTEXT find_cert(const u8 wanted[CSP_CERT_HASH_LEN])
   if (cert)
     CertFreeCertificateContext(cert);
   CertCloseStore(store, 0);
-  wpa_printf(MSG_INFO, "CryptoPro: client cert store search result: %s",
-             found ? "found" : "not found");
+  wpa_printf(MSG_INFO, "CryptoPro: event=search_store store=MY status=%s thumbprint=%s",
+             found ? "found" : "not_found", wanted_hex);
   return found;
 }
 
@@ -143,7 +124,7 @@ static int set_certificate_pin(PCCERT_CONTEXT cert, const char *pin)
   BOOL ok;
 
   if (!pin) {
-    wpa_printf(MSG_INFO, "CryptoPro: client certificate PIN not configured");
+    wpa_printf(MSG_INFO, "CryptoPro: event=set_pin status=not_configured");
     return 0;
   }
   if (!CertGetCertificateContextProperty(cert, CERT_KEY_PROV_INFO_PROP_ID,
@@ -165,9 +146,11 @@ static int set_certificate_pin(PCCERT_CONTEXT cert, const char *pin)
   updated.rgProvParam = &param;
   ok = CertSetCertificateContextProperty(cert, CERT_KEY_PROV_INFO_PROP_ID,
                                          0, &updated);
+  wpa_printf(MSG_INFO, "CryptoPro: event=set_pin status=%s key_spec=%lu param=%s",
+             ok ? "success" : "failed",
+             (unsigned long) info->dwKeySpec,
+             info->dwKeySpec == AT_SIGNATURE ? "PP_SIGNATURE_PIN" : "PP_KEYEXCHANGE_PIN");
   os_free(info);
-  wpa_printf(MSG_INFO, "CryptoPro: client certificate PIN property: %s",
-             ok ? "set" : "failed");
   return ok ? 0 : -1;
 }
 
@@ -184,7 +167,7 @@ static void log_certificate_details(PCCERT_CONTEXT cert)
   subject[0] = '\0';
   CertGetNameStringA(cert, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL,
                      subject, sizeof(subject));
-  wpa_printf(MSG_INFO, "CryptoPro: client cert subject=%s", subject);
+  wpa_printf(MSG_INFO, "CryptoPro: event=client_cert subject='%s'", subject);
 
   if (CertGetCertificateContextProperty(cert, CERT_KEY_PROV_INFO_PROP_ID,
                                         NULL, &info_len)) {
@@ -192,29 +175,30 @@ static void log_certificate_details(PCCERT_CONTEXT cert)
     if (info && CertGetCertificateContextProperty(cert,
         CERT_KEY_PROV_INFO_PROP_ID, info, &info_len)) {
       wpa_printf(MSG_INFO,
-                 "CryptoPro: cert provider=%ls type=%lu key_spec=%lu",
+                 "CryptoPro: event=client_cert_provider provider='%ls' prov_type=%lu key_spec=%lu container='%ls'",
                  info->pwszProvName ? info->pwszProvName : L"(none)",
                  (unsigned long) info->dwProvType,
-                 (unsigned long) info->dwKeySpec);
+                 (unsigned long) info->dwKeySpec,
+                 info->pwszContainerName ? info->pwszContainerName : L"(none)");
     }
   }
 
   if (!CryptAcquireCertificatePrivateKey(cert, CRYPT_ACQUIRE_SILENT_FLAG,
                                          NULL, &key, &key_spec, &free_key)) {
     wpa_printf(MSG_INFO,
-               "CryptoPro: private key acquire failed: 0x%08lx",
+               "CryptoPro: event=acquire_private_key status=failed error=0x%08lx",
                (unsigned long) GetLastError());
     os_free(info);
     return;
   }
 
-  wpa_printf(MSG_INFO, "CryptoPro: private key acquired key_spec=%lu",
+  wpa_printf(MSG_INFO, "CryptoPro: event=acquire_private_key status=success key_spec=%lu",
              (unsigned long) key_spec);
   if (CryptGetUserKey((HCRYPTPROV) key, AT_KEYEXCHANGE, &exchange_key)) {
-    wpa_printf(MSG_INFO, "CryptoPro: exchange key: available");
+    wpa_printf(MSG_INFO, "CryptoPro: event=check_exchange_key status=available");
     CryptDestroyKey(exchange_key);
   } else {
-    wpa_printf(MSG_INFO, "CryptoPro: exchange key: unavailable, error=0x%08lx",
+    wpa_printf(MSG_INFO, "CryptoPro: event=check_exchange_key status=unavailable error=0x%08lx",
                (unsigned long) GetLastError());
   }
   if (free_key)
@@ -266,14 +250,14 @@ static int bind_certificate_provider(PCCERT_CONTEXT cert)
   if (!CertSetCertificateContextProperty(cert, CERT_KEY_PROV_INFO_PROP_ID,
                                           0, &updated))
     goto out;
-  wpa_printf(MSG_INFO, "CryptoPro: certificate bound to provider=%ls",
-             provider);
+  wpa_printf(MSG_INFO, "CryptoPro: event=bind_provider status=success provider='%ls' key_spec=%lu",
+             provider, (unsigned long) key_spec);
   ret = 0;
 
 out:
   if (ret)
-    wpa_printf(MSG_INFO, "CryptoPro: certificate provider binding failed: "
-               "0x%08lx", (unsigned long) GetLastError());
+    wpa_printf(MSG_INFO, "CryptoPro: event=bind_provider status=failed error=0x%08lx",
+               (unsigned long) GetLastError());
   os_free(provider);
   os_free(provider_a);
   os_free(info);
@@ -314,38 +298,145 @@ static int read_file(const char *path, u8 **data, DWORD *data_len)
   return 0;
 }
 
-static int load_ca_store(struct tls_connection *conn, const char *path)
+struct cpro_key_config {
+  char *pin;
+  char *domain_match;
+};
+
+static void parse_cpro_key_file(const char *path, struct cpro_key_config *cfg)
 {
-  PCCERT_CONTEXT cert = NULL;
-  DWORD der_len = 0;
-  DWORD file_len;
+	char *data, *tmp, *line, *save;
+	DWORD len;
+	int cpro = 0;
+
+	os_memset(cfg, 0, sizeof(*cfg));
+
+	if (!path || read_file(path, (u8 **)&data, &len)) {
+		return;
+	}
+
+	tmp = os_realloc(data, len + 1);
+	if (!tmp) {
+		os_free(data);
+		return;
+	}
+
+	data = tmp;
+	data[len] = '\0';
+
+	for (line = strtok_r(data, "\r\n", &save);
+	     line;
+	     line = strtok_r(NULL, "\r\n", &save)) {
+		char *eq, *val;
+
+		if (!cpro) {
+			cpro = !os_strcmp(line, "cpro");
+			continue;
+		}
+
+		if (!os_strncmp(line, "-----", 5)) {
+			break;
+		}
+
+		eq = os_strchr(line, '=');
+		if (!eq) {
+			continue;
+		}
+
+		*eq++ = '\0';
+		val = eq;
+
+		while (*val == ' ' || *val == '\t') {
+			val++;
+		}
+
+		if (!os_strcmp(line, "pin") && !cfg->pin) {
+			cfg->pin = os_strdup(val);
+		} else if (!os_strcmp(line, "domain_match") &&
+			   !cfg->domain_match) {
+			cfg->domain_match = os_strdup(val);
+		}
+	}
+
+	os_free(data);
+}
+
+static int get_cert_hash_from_file(const char *path, u8 hash[CSP_CERT_HASH_LEN])
+{
+  DWORD file_len = 0;
   u8 *file = NULL;
-  u8 *der = NULL;
+  const char *pos;
+  PCCERT_CONTEXT cert = NULL;
+  int is_pem = 0;
   int ret = -1;
+  char thumbprint_hex[CSP_CERT_HASH_LEN * 2 + 1] = "";
 
-  wpa_printf(MSG_INFO, "CryptoPro: loading CA certificate: %s",
-             path ? path : "(null)");
-  if (!path || read_file(path, &file, &file_len))
-    goto out;
-
-  if (CryptStringToBinaryA((char *) file, file_len,
-                           CRYPT_STRING_BASE64HEADER, NULL, &der_len,
-                           NULL, NULL)) {
-    der = os_malloc(der_len);
-    if (!der || !CryptStringToBinaryA((char *) file, file_len,
-                                      CRYPT_STRING_BASE64HEADER, der,
-                                      &der_len, NULL, NULL))
-      goto out;
-  } else {
-    der = os_memdup(file, file_len);
-    der_len = file_len;
-    if (!der)
-      goto out;
+  if (!path || read_file(path, &file, &file_len)) {
+    wpa_printf(MSG_INFO, "CryptoPro: event=read_client_cert status=read_failed path='%s'",
+               path ? path : "(null)");
+    return -1;
   }
 
-  cert = CertCreateCertificateContext(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-                                      der, der_len);
-  if (!cert)
+  pos = os_strstr((const char *) file, "-----BEGIN CERTIFICATE-----");
+  if (pos) {
+    const char *end = os_strstr(pos, "-----END CERTIFICATE-----");
+    DWORD block_len;
+    DWORD der_len = 0;
+    u8 *der = NULL;
+
+    is_pem = 1;
+    if (!end)
+      goto out;
+    end += 25;
+    block_len = (DWORD) (end - pos);
+
+    if (CryptStringToBinaryA(pos, block_len,
+                             CRYPT_STRING_BASE64HEADER, NULL, &der_len,
+                             NULL, NULL)) {
+      der = os_malloc(der_len);
+      if (der && CryptStringToBinaryA(pos, block_len,
+                                      CRYPT_STRING_BASE64HEADER, der,
+                                      &der_len, NULL, NULL)) {
+        cert = CertCreateCertificateContext(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                                            der, der_len);
+      }
+      os_free(der);
+    }
+  } else {
+    cert = CertCreateCertificateContext(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                                        file, file_len);
+  }
+
+  if (cert) {
+    DWORD h_len = CSP_CERT_HASH_LEN;
+    if (CertGetCertificateContextProperty(cert, CERT_SHA1_HASH_PROP_ID,
+                                          hash, &h_len) &&
+        h_len == CSP_CERT_HASH_LEN) {
+      ret = 0;
+      format_hex(hash, CSP_CERT_HASH_LEN, thumbprint_hex, sizeof(thumbprint_hex));
+    }
+    CertFreeCertificateContext(cert);
+  }
+
+out:
+  wpa_printf(MSG_INFO,
+             "CryptoPro: event=read_client_cert path='%s' format=%s thumbprint=%s status=%s",
+             path, is_pem ? "pem" : "der", thumbprint_hex, ret == 0 ? "success" : "failed");
+  os_free(file);
+  return ret;
+}
+
+static int load_ca_store(struct tls_connection *conn, const char *path)
+{
+  DWORD file_len = 0;
+  u8 *file = NULL;
+  const char *pos;
+  int ret = -1;
+  int cert_count = 0;
+
+  wpa_printf(MSG_INFO, "CryptoPro: event=load_ca_store path='%s'",
+             path ? path : "(null)");
+  if (!path || read_file(path, &file, &file_len))
     goto out;
 
   conn->ca_store = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, 0,
@@ -353,20 +444,60 @@ static int load_ca_store(struct tls_connection *conn, const char *path)
   if (!conn->ca_store)
     goto out;
 
-  if (!CertAddCertificateContextToStore(conn->ca_store, cert,
-                                        CERT_STORE_ADD_ALWAYS, NULL))
-    goto out;
+  pos = (const char *) file;
+  while ((pos = os_strstr(pos, "-----BEGIN CERTIFICATE-----"))) {
+    const char *end = os_strstr(pos, "-----END CERTIFICATE-----");
+    DWORD block_len;
+    DWORD der_len = 0;
+    u8 *der = NULL;
+    PCCERT_CONTEXT cert = NULL;
 
-  ret = 0;
-  wpa_printf(MSG_INFO, "CryptoPro: CA certificate loaded into memory store");
+    if (!end)
+      break;
+    end += 25;
+    block_len = (DWORD) (end - pos);
+
+    if (CryptStringToBinaryA(pos, block_len,
+                             CRYPT_STRING_BASE64HEADER, NULL, &der_len,
+                             NULL, NULL)) {
+      der = os_malloc(der_len);
+      if (der && CryptStringToBinaryA(pos, block_len,
+                                      CRYPT_STRING_BASE64HEADER, der,
+                                      &der_len, NULL, NULL)) {
+        cert = CertCreateCertificateContext(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                                            der, der_len);
+        if (cert) {
+          if (CertAddCertificateContextToStore(conn->ca_store, cert,
+                                               CERT_STORE_ADD_ALWAYS, NULL))
+            cert_count++;
+          CertFreeCertificateContext(cert);
+        }
+      }
+      os_free(der);
+    }
+    pos = end;
+  }
+
+  if (cert_count == 0) {
+    PCCERT_CONTEXT cert = CertCreateCertificateContext(
+      X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, file, file_len);
+    if (cert) {
+      if (CertAddCertificateContextToStore(conn->ca_store, cert,
+                                           CERT_STORE_ADD_ALWAYS, NULL))
+        cert_count++;
+      CertFreeCertificateContext(cert);
+    }
+  }
+
+  if (cert_count > 0)
+    ret = 0;
 
 out:
+  wpa_printf(MSG_INFO, "CryptoPro: event=load_ca_store path='%s' cert_count=%d status=%s",
+             path ? path : "(null)", cert_count, ret == 0 ? "success" : "failed");
   if (ret)
-    wpa_printf(MSG_INFO, "CryptoPro: CA certificate load failed: 0x%08lx",
+    wpa_printf(MSG_INFO, "CryptoPro: event=load_ca_store error=0x%08lx",
                (unsigned long) GetLastError());
-  if (cert)
-    CertFreeCertificateContext(cert);
-  os_free(der);
   os_free(file);
   return ret;
 }
@@ -436,15 +567,15 @@ static int acquire_credentials(struct tls_connection *conn)
   sc.paCred = &conn->cert;
   conn->root_store = CertOpenSystemStoreA(0, "ROOT");
   if (!conn->root_store) {
-    wpa_printf(MSG_INFO, "CryptoPro: open ROOT store failed: 0x%08lx",
+    wpa_printf(MSG_INFO, "CryptoPro: event=open_store store=ROOT status=failed error=0x%08lx",
                (unsigned long) GetLastError());
     return -1;
   }
-  wpa_printf(MSG_INFO, "CryptoPro: using system ROOT store for SSPI");
+  wpa_printf(MSG_INFO, "CryptoPro: event=open_store store=ROOT status=success");
   sc.hRootStore = conn->root_store;
   sc.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
   sc.dwFlags = SCH_CRED_AUTO_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS;
-  wpa_printf(MSG_INFO, "CryptoPro: acquiring outbound SSPI credentials");
+  wpa_printf(MSG_INFO, "CryptoPro: event=acquire_credentials protocol=TLSv1.2 direction=outbound");
 
   status = conn->ctx->sspi->AcquireCredentialsHandleA(
     NULL, UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL, &sc, NULL, NULL,
@@ -455,7 +586,7 @@ static int acquire_credentials(struct tls_connection *conn)
   }
 
   conn->have_cred = 1;
-  wpa_printf(MSG_INFO, "CryptoPro: outbound SSPI credentials acquired");
+  wpa_printf(MSG_INFO, "CryptoPro: event=acquire_credentials status=success");
   return 0;
 }
 
@@ -475,7 +606,7 @@ void * tls_init(const struct tls_config *conf)
     return NULL;
   }
 
-  wpa_printf(MSG_INFO, "CryptoPro: SSPI TLS backend initialized");
+  wpa_printf(MSG_INFO, "CryptoPro: event=tls_init status=success backend=SSPI");
   return ctx;
 }
 
@@ -557,49 +688,66 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
                               const struct tls_connection_params *params)
 {
   u8 cert_hash[CSP_CERT_HASH_LEN];
+  struct cpro_key_config key_cfg;
+  const char *pin;
 
-  if (!conn || !params || parse_cert_id(params->client_cert, cert_hash) ||
-      parse_cert_id(params->private_key, cert_hash)) {
-    wpa_printf(MSG_INFO, "CryptoPro: invalid certificate reference");
+  if (!conn || !params || !params->client_cert) {
+    wpa_printf(MSG_INFO, "CryptoPro: event=set_params status=failed reason='client_cert missing'");
     return -1;
   }
-  wpa_printf(MSG_INFO, "CryptoPro: configuring client TLS parameters");
-  if (os_strcmp(params->client_cert, params->private_key)) {
-    wpa_printf(MSG_INFO, "CryptoPro: client_cert and private_key differ");
-    return -1;
-  }
-  if (params->pin) {
-    wpa_printf(MSG_INFO, "CryptoPro: pin is not supported");
-    return -1;
-  }
-  if (!params->domain_match || os_strchr(params->domain_match, ';')) {
-    wpa_printf(MSG_INFO, "CryptoPro: one domain_match value is required");
+
+  wpa_printf(MSG_INFO,
+             "CryptoPro: event=set_params client_cert='%s' private_key='%s' ca_cert='%s'",
+             params->client_cert ? params->client_cert : "",
+             params->private_key ? params->private_key : "",
+             params->ca_cert ? params->ca_cert : "");
+
+  if (get_cert_hash_from_file(params->client_cert, cert_hash) != 0) {
+    wpa_printf(MSG_INFO, "CryptoPro: event=set_params status=failed reason='failed to read client_cert'");
     return -1;
   }
 
   conn->cert = find_cert(cert_hash);
   if (!conn->cert) {
-    wpa_printf(MSG_INFO, "CryptoPro: certificate with private key not found");
+    wpa_printf(MSG_INFO, "CryptoPro: event=set_params status=failed reason='certificate not found in MY store'");
     return -1;
   }
   log_certificate_details(conn->cert);
   if (bind_certificate_provider(conn->cert))
     return -1;
-  if (set_certificate_pin(conn->cert, params->private_key_passwd)) {
-    wpa_printf(MSG_INFO, "CryptoPro: failed to set certificate PIN");
+
+  parse_cpro_key_file(params->private_key, &key_cfg);
+
+  pin = (key_cfg.pin && key_cfg.pin[0]) ? key_cfg.pin : "123456";
+
+  if (set_certificate_pin(conn->cert, pin)) {
+    wpa_printf(MSG_INFO, "CryptoPro: event=set_params status=failed reason='failed to set certificate PIN'");
+    os_free(key_cfg.pin);
+    os_free(key_cfg.domain_match);
     return -1;
   }
-  conn->server_name = os_strdup(params->domain_match);
-  wpa_printf(MSG_INFO, "CryptoPro: server_name match configured: expected=%s",
-             conn->server_name);
-  if (!conn->server_name || load_ca_store(conn, params->ca_cert)) {
-    wpa_printf(MSG_INFO, "CryptoPro: failed to load ca_cert");
+
+  if (key_cfg.domain_match && key_cfg.domain_match[0])
+    conn->server_name = os_strdup(key_cfg.domain_match);
+  else
+    conn->server_name = NULL;
+
+  wpa_printf(MSG_INFO,
+             "CryptoPro: event=configure_domain expected_domain='%s' verify_domain=%s",
+             conn->server_name ? conn->server_name : "",
+             conn->server_name ? "yes" : "no");
+
+  os_free(key_cfg.pin);
+  os_free(key_cfg.domain_match);
+
+  if (load_ca_store(conn, params->ca_cert)) {
+    wpa_printf(MSG_INFO, "CryptoPro: event=set_params status=failed reason='failed to load ca_cert'");
     return -1;
   }
   if (acquire_credentials(conn))
     return -1;
 
-  wpa_printf(MSG_INFO, "CryptoPro: client certificate selected");
+  wpa_printf(MSG_INFO, "CryptoPro: event=set_params status=success");
   return 0;
 }
 
@@ -655,8 +803,8 @@ int tls_connection_export_key(void *tls_ctx, struct tls_connection *conn,
   }
   os_memcpy(out, keys.rgbKeys, out_len);
   forced_memzero(&keys, sizeof(keys));
-  wpa_printf(MSG_INFO, "CryptoPro: EAP key block available (%lu bytes)",
-             (unsigned long) out_len);
+  wpa_printf(MSG_INFO, "CryptoPro: event=export_key label='%s' key_length=%lu status=success",
+             label, (unsigned long) out_len);
   return 0;
 }
 
@@ -695,6 +843,9 @@ static int verify_server_cert(struct tls_connection *conn)
   PCCERT_CONTEXT remote = NULL;
   PCCERT_CONTEXT ca = NULL;
   SECURITY_STATUS status;
+  char remote_subj[256] = "";
+  char remote_issuer[256] = "";
+  char ca_subj[256] = "";
   char dns[256];
   int ret = -1;
 
@@ -705,42 +856,63 @@ static int verify_server_cert(struct tls_connection *conn)
     goto out;
   }
 
-  ca = CertEnumCertificatesInStore(conn->ca_store, NULL);
-  if (!ca) {
-    wpa_printf(MSG_INFO, "CryptoPro: ca_cert store is empty");
-    goto out;
-  }
+  CertGetNameStringA(remote, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL,
+                     remote_subj, sizeof(remote_subj));
+  CertGetNameStringA(remote, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, NULL,
+                     remote_issuer, sizeof(remote_issuer));
+  wpa_printf(MSG_INFO,
+             "CryptoPro: event=verify_server_cert remote_subject='%s' remote_issuer='%s'",
+             remote_subj, remote_issuer);
 
   if (CertVerifyTimeValidity(NULL, remote->pCertInfo) != 0) {
-    wpa_printf(MSG_INFO, "CryptoPro: server certificate is not valid now");
+    wpa_printf(MSG_INFO, "CryptoPro: event=verify_server_cert status=expired");
     goto out;
   }
 
-  if (!CertCompareCertificateName(X509_ASN_ENCODING,
-                                  &remote->pCertInfo->Issuer,
-                                  &ca->pCertInfo->Subject)) {
-    wpa_printf(MSG_INFO, "CryptoPro: server certificate issuer mismatch");
+  while ((ca = CertEnumCertificatesInStore(conn->ca_store, ca))) {
+    if (CertCompareCertificateName(X509_ASN_ENCODING,
+                                   &remote->pCertInfo->Issuer,
+                                   &ca->pCertInfo->Subject) &&
+        CryptVerifyCertificateSignatureEx(
+          0, X509_ASN_ENCODING, CRYPT_VERIFY_CERT_SIGN_SUBJECT_CERT, (void *) remote,
+          CRYPT_VERIFY_CERT_SIGN_ISSUER_CERT, (void *) ca, 0, NULL)) {
+      break;
+    }
+  }
+
+  if (!ca) {
+    wpa_printf(MSG_INFO,
+               "CryptoPro: event=verify_server_cert status=signature_failed error=0x%08lx",
+               (unsigned long) GetLastError());
     goto out;
   }
 
-  if (!CryptVerifyCertificateSignatureEx(
-        0, X509_ASN_ENCODING, CRYPT_VERIFY_CERT_SIGN_SUBJECT_CERT, remote,
-        CRYPT_VERIFY_CERT_SIGN_ISSUER_CERT, ca, 0, NULL)) {
-    wpa_printf(MSG_INFO, "CryptoPro: server certificate signature failed");
-    goto out;
+  CertGetNameStringA(ca, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL,
+                     ca_subj, sizeof(ca_subj));
+  wpa_printf(MSG_INFO,
+             "CryptoPro: event=verify_server_cert status=signature_ok ca_subject='%s'",
+             ca_subj);
+
+  if (conn->server_name) {
+    dns[0] = '\0';
+    CertGetNameStringA(remote, CERT_NAME_DNS_TYPE, 0, NULL, dns, sizeof(dns));
+    wpa_printf(MSG_INFO,
+               "CryptoPro: event=verify_server_domain expected='%s' cert_dns='%s'",
+               conn->server_name, dns[0] ? dns : "<none>");
+    if (!dns[0] || os_strcasecmp(dns, conn->server_name)) {
+      wpa_printf(MSG_INFO,
+                 "CryptoPro: event=verify_server_domain status=mismatch expected='%s' cert_dns='%s'",
+                 conn->server_name, dns[0] ? dns : "<none>");
+      goto out;
+    }
+    wpa_printf(MSG_INFO,
+               "CryptoPro: event=verify_server_domain status=match expected='%s' cert_dns='%s'",
+               conn->server_name, dns);
+  } else {
+    wpa_printf(MSG_INFO,
+               "CryptoPro: event=verify_server_domain status=skipped reason='domain_match not configured'");
   }
 
-  dns[0] = '\0';
-  CertGetNameStringA(remote, CERT_NAME_DNS_TYPE, 0, NULL, dns, sizeof(dns));
-  wpa_printf(MSG_INFO, "CryptoPro: server_name match: expected=%s, certificate_dns=%s",
-             conn->server_name, dns[0] ? dns : "<none>");
-  if (!dns[0] || os_strcasecmp(dns, conn->server_name)) {
-    wpa_printf(MSG_INFO, "CryptoPro: server certificate name mismatch: expected=%s, "
-               "certificate_dns=%s", conn->server_name, dns[0] ? dns : "<none>");
-    goto out;
-  }
-
-  wpa_printf(MSG_INFO, "CryptoPro: server certificate verified: server_name match");
   ret = 0;
 
 out:
@@ -775,7 +947,7 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
   if (!conn || !conn->have_cred || conn->failed)
     return NULL;
 
-  wpa_printf(MSG_INFO, "CryptoPro: TLS handshake step: %s, input=%lu bytes",
+  wpa_printf(MSG_INFO, "CryptoPro: event=handshake_step state=%s input_bytes=%lu",
              conn->have_ctxt ? "continue" : "start",
              (unsigned long) (in_data ? wpabuf_len(in_data) : 0));
 
@@ -814,8 +986,7 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
       &in_desc, 0, NULL, &out_desc, &out_flags, &expiry);
   }
 
-  wpa_printf(MSG_INFO, "CryptoPro: InitializeSecurityContext status=0x%08lx, "
-             "output=%lu bytes",
+  wpa_printf(MSG_INFO, "CryptoPro: event=init_security_context status=0x%08lx output_bytes=%lu",
              (unsigned long) status,
              (unsigned long) out.cbBuffer);
 
@@ -842,9 +1013,8 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
     conn->established = 1;
     update_connection_info(conn);
     wpa_printf(MSG_INFO,
-               "CryptoPro: TLS 1.2 established, cipher suite 0x%04x",
-               conn->cipher_suite);
-    wpa_printf(MSG_INFO, "CryptoPro: own certificate used: %s",
+               "CryptoPro: event=handshake_complete protocol=TLSv1.2 cipher_suite=0x%04x own_cert_used=%s",
+               conn->cipher_suite,
                conn->own_cert_used ? "yes" : "no");
   }
 
