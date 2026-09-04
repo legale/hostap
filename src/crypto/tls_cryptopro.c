@@ -18,6 +18,11 @@
 #include <cpcsp/CSP_SChannel.h>
 
 #include <string.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 #define CSP_CERT_HASH_LEN 20
 #define GOST_TLS12_SUITE 0xc100
@@ -48,6 +53,10 @@ struct tls_connection {
   int have_server_random;
   u16 cipher_suite;
   char *server_name;
+  /* Идентификатор и имя пользователя, чье хранилище и ключ используются */
+  uid_t user_uid;
+  gid_t user_gid;
+  char user_name[64];
 };
 
 static void csp_error(struct tls_connection *conn, const char *op,
@@ -181,57 +190,238 @@ static void log_tls_records(const char *direction, const u8 *buf, size_t len)
   }
 }
 
-static PCCERT_CONTEXT find_cert(const u8 wanted[CSP_CERT_HASH_LEN])
+
+/*
+ * Структура для сохранения и восстановления контекста пользователя.
+ * Позволяет процессу wpa_supplicant (работающему от root) временно переключаться
+ * в контекст активного пользователя для доступа к его хранилищу и закрытым ключам КриптоПро.
+ */
+struct cpro_user_ctx {
+  uid_t orig_uid;
+  gid_t orig_gid;
+  char orig_user[128];
+  char orig_home[256];
+  int active;
+};
+
+/*
+ * Информация о пользователе-кандидате для поиска сертификата.
+ */
+struct cpro_user_info {
+  uid_t uid;
+  gid_t gid;
+  char name[64];
+};
+
+/*
+ * Временный переход в контекст пользователя (EUID/EGID, USER, HOME).
+ */
+static void cpro_enter_user(uid_t uid, gid_t gid, struct cpro_user_ctx *ctx)
 {
-  HCERTSTORE store;
-  PCCERT_CONTEXT cert = NULL;
-  PCCERT_CONTEXT found = NULL;
+  struct passwd *pw;
+  const char *u;
+  const char *h;
+
+  ctx->active = 0;
+  if (geteuid() != 0 || uid == 0)
+    return;
+
+  ctx->orig_uid = geteuid();
+  ctx->orig_gid = getegid();
+  u = getenv("USER");
+  h = getenv("HOME");
+  os_strlcpy(ctx->orig_user, u ? u : "", sizeof(ctx->orig_user));
+  os_strlcpy(ctx->orig_home, h ? h : "", sizeof(ctx->orig_home));
+
+  pw = getpwuid(uid);
+  if (!pw)
+    return;
+
+  if (setegid(gid) != 0 || seteuid(uid) != 0) {
+    wpa_printf(MSG_INFO, "cpro: warning failed to seteuid to %u", (unsigned int) uid);
+    return;
+  }
+  setenv("USER", pw->pw_name, 1);
+  setenv("LOGNAME", pw->pw_name, 1);
+  setenv("HOME", pw->pw_dir, 1);
+  ctx->active = 1;
+}
+
+/*
+ * Возврат в исходный контекст (root).
+ */
+static void cpro_leave_user(struct cpro_user_ctx *ctx)
+{
+  if (!ctx->active)
+    return;
+
+  if (seteuid(ctx->orig_uid) != 0 || setegid(ctx->orig_gid) != 0) {
+    wpa_printf(MSG_INFO, "cpro: warning failed to restore original euid");
+  }
+  if (ctx->orig_user[0])
+    setenv("USER", ctx->orig_user, 1);
+  else
+    unsetenv("USER");
+  if (ctx->orig_home[0])
+    setenv("HOME", ctx->orig_home, 1);
+  else
+    unsetenv("HOME");
+  ctx->active = 0;
+}
+
+/*
+ * Поиск пользователей-кандидатов в системе:
+ * 1. Активные авторизованные сессии (/run/user/<UID>)
+ * 2. Пользователи с каталогами хранилищ в /var/opt/cprocsp/users/
+ * 3. Fallback: учетная запись root (UID 0)
+ */
+static int get_candidate_users(struct cpro_user_info *users, int max_users)
+{
+  int count = 0;
+  DIR *dir;
+  struct dirent *de;
+
+  /* 1. Сканируем активные сессии пользователей из /run/user */
+  dir = opendir("/run/user");
+  if (dir) {
+    while ((de = readdir(dir)) != NULL && count < max_users) {
+      uid_t uid;
+      struct passwd *pw;
+      if (de->d_name[0] < '0' || de->d_name[0] > '9')
+        continue;
+      uid = (uid_t) atoi(de->d_name);
+      if (uid >= 1000) {
+        pw = getpwuid(uid);
+        if (pw) {
+          users[count].uid = uid;
+          users[count].gid = pw->pw_gid;
+          os_strlcpy(users[count].name, pw->pw_name, sizeof(users[count].name));
+          count++;
+        }
+      }
+    }
+    closedir(dir);
+  }
+
+  /* 2. Сканируем пользователей, у которых созданы профили в КриптоПро */
+  dir = opendir("/var/opt/cprocsp/users");
+  if (dir) {
+    while ((de = readdir(dir)) != NULL && count < max_users) {
+      int already = 0;
+      int i;
+      struct passwd *pw;
+      if (de->d_name[0] == '.')
+        continue;
+      if (os_strcmp(de->d_name, "root") == 0)
+        continue;
+      for (i = 0; i < count; i++) {
+        if (os_strcmp(users[i].name, de->d_name) == 0) {
+          already = 1;
+          break;
+        }
+      }
+      if (already)
+        continue;
+      pw = getpwnam(de->d_name);
+      if (pw && pw->pw_uid >= 1000) {
+        users[count].uid = pw->pw_uid;
+        users[count].gid = pw->pw_gid;
+        os_strlcpy(users[count].name, pw->pw_name, sizeof(users[count].name));
+        count++;
+      }
+    }
+    closedir(dir);
+  }
+
+  /* 3. Fallback: учетная запись root */
+  if (count < max_users) {
+    users[count].uid = 0;
+    users[count].gid = 0;
+    os_strlcpy(users[count].name, "root", sizeof(users[count].name));
+    count++;
+  }
+
+  return count;
+}
+
+/*
+ * Поиск клиентского сертификата по SHA1-отпечатку:
+ * перебирает хранилища MY активных пользователей, затем fallback на root.
+ */
+static PCCERT_CONTEXT find_cert(const u8 wanted[CSP_CERT_HASH_LEN], struct cpro_user_info *selected_user)
+{
+  struct cpro_user_info candidates[16];
+  int num_candidates;
   char wanted_hex[CSP_CERT_HASH_LEN * 2 + 1];
-  char cn[256] = "";
+  PCCERT_CONTEXT found = NULL;
+  int i;
 
   format_hex(wanted, CSP_CERT_HASH_LEN, wanted_hex, sizeof(wanted_hex));
+  num_candidates = get_candidate_users(candidates, 16);
 
-  store = CertOpenSystemStoreA(0, "MY");
-  if (!store) {
-    wpa_printf(MSG_INFO, "cpro: event=open_store store=MY status=failed error=0x%08lx",
-               (unsigned long) GetLastError());
-    return NULL;
-  }
-  wpa_printf(MSG_INFO, "cpro: event=search_store store=MY wanted_thumbprint=%s", wanted_hex);
+  wpa_printf(MSG_INFO, "cpro: event=search_candidates count=%d wanted_thumbprint=%s",
+             num_candidates, wanted_hex);
 
-  while ((cert = CertEnumCertificatesInStore(store, cert))) {
-    DWORD hash_len = CSP_CERT_HASH_LEN;
-    u8 hash[CSP_CERT_HASH_LEN];
+  for (i = 0; i < num_candidates; i++) {
+    struct cpro_user_ctx u_ctx;
+    HCERTSTORE store;
+    PCCERT_CONTEXT cert = NULL;
+    char cn[256] = "";
 
-    if (!CertGetCertificateContextProperty(cert, CERT_SHA1_HASH_PROP_ID,
-                                           hash, &hash_len) ||
-        hash_len != CSP_CERT_HASH_LEN ||
-        os_memcmp(hash, wanted, sizeof(hash)))
+    wpa_printf(MSG_INFO, "cpro: event=search_store user='%s' uid=%u store=MY wanted_thumbprint=%s",
+               candidates[i].name, (unsigned int) candidates[i].uid, wanted_hex);
+
+    /* Временно переключаемся под учетную запись пользователя */
+    cpro_enter_user(candidates[i].uid, candidates[i].gid, &u_ctx);
+
+    store = CertOpenSystemStoreA(0, "MY");
+    if (!store) {
+      wpa_printf(MSG_INFO, "cpro: event=open_store user='%s' uid=%u store=MY status=failed error=0x%08lx",
+                 candidates[i].name, (unsigned int) candidates[i].uid, (unsigned long) GetLastError());
+      cpro_leave_user(&u_ctx);
       continue;
+    }
 
-    get_cert_cn(cert, cn, sizeof(cn));
-    if (CertVerifyTimeValidity(NULL, cert->pCertInfo) != 0) {
-      wpa_printf(MSG_INFO, "cpro: event=check_cert status=expired cn='%s' thumbprint=%s",
-                 cn, wanted_hex);
+    while ((cert = CertEnumCertificatesInStore(store, cert))) {
+      DWORD hash_len = CSP_CERT_HASH_LEN;
+      u8 hash[CSP_CERT_HASH_LEN];
+
+      if (!CertGetCertificateContextProperty(cert, CERT_SHA1_HASH_PROP_ID,
+                                             hash, &hash_len) ||
+          hash_len != CSP_CERT_HASH_LEN ||
+          os_memcmp(hash, wanted, sizeof(hash)))
+        continue;
+
+      get_cert_cn(cert, cn, sizeof(cn));
+      if (CertVerifyTimeValidity(NULL, cert->pCertInfo) != 0) {
+        wpa_printf(MSG_INFO, "cpro: event=check_cert user='%s' status=expired cn='%s' thumbprint=%s",
+                   candidates[i].name, cn, wanted_hex);
+        break;
+      }
+
+      found = CertDuplicateCertificateContext(cert);
       break;
     }
 
-    found = CertDuplicateCertificateContext(cert);
-    break;
+    if (cert)
+      CertFreeCertificateContext(cert);
+    CertCloseStore(store, 0);
+
+    /* Возвращаемся в контекст root */
+    cpro_leave_user(&u_ctx);
+
+    if (found) {
+      wpa_printf(MSG_INFO, "cpro: event=search_store user='%s' uid=%u store=MY status=found cn='%s' thumbprint=%s",
+                 candidates[i].name, (unsigned int) candidates[i].uid, cn, wanted_hex);
+      if (selected_user)
+        *selected_user = candidates[i];
+      return found;
+    }
   }
 
-  if (cert)
-    CertFreeCertificateContext(cert);
-  CertCloseStore(store, 0);
-
-  if (found) {
-    wpa_printf(MSG_INFO, "cpro: event=search_store store=MY status=found cn='%s' thumbprint=%s",
-               cn, wanted_hex);
-  } else {
-    wpa_printf(MSG_INFO, "cpro: event=search_store store=MY status=not_found thumbprint=%s",
-               wanted_hex);
-  }
-  return found;
+  wpa_printf(MSG_INFO, "cpro: event=search_store store=MY status=not_found thumbprint=%s",
+             wanted_hex);
+  return NULL;
 }
 
 static int set_certificate_pin(PCCERT_CONTEXT cert, const char *pin)
@@ -725,9 +915,17 @@ static int acquire_credentials(struct tls_connection *conn)
   sc.dwFlags = SCH_CRED_AUTO_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS;
   wpa_printf(MSG_INFO, "cpro: event=acquire_credentials protocol=TLSv1.2 direction=outbound");
 
+  /* Выполняем вызов AcquireCredentialsHandle под пользователем владельца ключа */
+  struct cpro_user_ctx u_ctx;
+  if (conn->user_uid != 0)
+    cpro_enter_user(conn->user_uid, conn->user_gid, &u_ctx);
+
   status = conn->ctx->sspi->AcquireCredentialsHandleA(
     NULL, UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL, &sc, NULL, NULL,
     &conn->cred, &expiry);
+
+  if (conn->user_uid != 0)
+    cpro_leave_user(&u_ctx);
   if (status != SEC_E_OK) {
     csp_error(conn, "AcquireCredentialsHandle", status);
     return -1;
@@ -789,12 +987,17 @@ struct tls_connection * tls_connection_init(void *tls_ctx)
 
 void tls_connection_deinit(void *tls_ctx, struct tls_connection *conn)
 {
+  struct cpro_user_ctx u_ctx;
   if (!conn)
     return;
+  if (conn->user_uid != 0)
+    cpro_enter_user(conn->user_uid, conn->user_gid, &u_ctx);
   if (conn->have_ctxt)
     conn->ctx->sspi->DeleteSecurityContext(&conn->ctxt);
   if (conn->have_cred)
     conn->ctx->sspi->FreeCredentialsHandle(&conn->cred);
+  if (conn->user_uid != 0)
+    cpro_leave_user(&u_ctx);
   if (conn->cert)
     CertFreeCertificateContext(conn->cert);
   if (conn->ca_store)
@@ -855,25 +1058,49 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
     return -1;
   }
 
-  conn->cert = find_cert(cert_hash);
+  struct cpro_user_info selected_user;
+  struct cpro_user_ctx u_ctx;
+  selected_user.uid = 0;
+  selected_user.gid = 0;
+  os_strlcpy(selected_user.name, "root", sizeof(selected_user.name));
+
+  /* Ищем сертификат в хранилищах активных пользователей */
+  conn->cert = find_cert(cert_hash, &selected_user);
   if (!conn->cert) {
     wpa_printf(MSG_INFO, "cpro: event=set_params status=failed reason='certificate not found in MY store'");
     return -1;
   }
+
+  conn->user_uid = selected_user.uid;
+  conn->user_gid = selected_user.gid;
+  os_strlcpy(conn->user_name, selected_user.name, sizeof(conn->user_name));
+  wpa_printf(MSG_INFO, "cpro: event=user_selected user='%s' uid=%u gid=%u",
+             conn->user_name, (unsigned int) conn->user_uid, (unsigned int) conn->user_gid);
+
+  /* Привязка провайдера и установка PIN в контексте выбранного пользователя */
+  if (conn->user_uid != 0)
+    cpro_enter_user(conn->user_uid, conn->user_gid, &u_ctx);
+
   log_certificate_details(conn->cert);
-  if (bind_certificate_provider(conn->cert))
+  if (bind_certificate_provider(conn->cert)) {
+    if (conn->user_uid != 0)
+      cpro_leave_user(&u_ctx);
     return -1;
+  }
 
   parse_cpro_key_file(params->private_key, &key_cfg);
-
   pin = (key_cfg.pin && key_cfg.pin[0]) ? key_cfg.pin : "123456";
 
   if (set_certificate_pin(conn->cert, pin)) {
     wpa_printf(MSG_INFO, "cpro: event=set_params status=failed reason='failed to set certificate PIN'");
+    if (conn->user_uid != 0)
+      cpro_leave_user(&u_ctx);
     os_free(key_cfg.pin);
     os_free(key_cfg.domain_match);
     return -1;
   }
+  if (conn->user_uid != 0)
+    cpro_leave_user(&u_ctx);
 
   if (key_cfg.domain_match && key_cfg.domain_match[0])
     conn->server_name = os_strdup(key_cfg.domain_match);
@@ -1121,6 +1348,11 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
   out_desc.cBuffers = 1;
   out_desc.pBuffers = &out;
 
+  /* Входим в контекст пользователя для операций с закрытым ключом контейнера */
+  struct cpro_user_ctx u_ctx;
+  if (conn->user_uid != 0)
+    cpro_enter_user(conn->user_uid, conn->user_gid, &u_ctx);
+
   if (!conn->have_ctxt) {
     wpa_printf(MSG_INFO, "cpro: event=prepare_handshake_msg type=ClientHello(1)");
     status = conn->ctx->sspi->InitializeSecurityContextA(
@@ -1149,6 +1381,9 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
       &conn->cred, &conn->ctxt, NULL, flags, 0, SECURITY_NATIVE_DREP,
       &in_desc, 0, NULL, &out_desc, &out_flags, &expiry);
   }
+
+  if (conn->user_uid != 0)
+    cpro_leave_user(&u_ctx);
 
   wpa_printf(MSG_INFO, "cpro: event=init_security_context status=0x%08lx output_bytes=%lu",
              (unsigned long) status,
