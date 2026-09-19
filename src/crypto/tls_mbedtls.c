@@ -1861,9 +1861,11 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf,
 			os_memcpy(tls_conf->curves, gost_groups, sizeof(gost_groups));
 			mbedtls_ssl_conf_groups(&tls_conf->conf, tls_conf->curves);
 
-			/* TLS 1.3: advertise GOST signature scheme gostr34102012_256a (RFC 9367) */
+			/* GOST signature schemes: TLS 1.3 (0x0709) and TLS 1.2 (0x0840, 0x0841) */
 			static const uint16_t gost_sig_algs[] = {
 				MBEDTLS_TLS1_3_SIG_GOSTR34102012_256A, /* 0x0709 */
+				(MBEDTLS_SSL_HASH_INTRINSIC << 8) | MBEDTLS_SSL_SIG_GOST256, /* 0x0840 */
+				(MBEDTLS_SSL_HASH_INTRINSIC << 8) | MBEDTLS_SSL_SIG_GOST512, /* 0x0841 */
 				MBEDTLS_TLS1_3_SIG_NONE
 			};
 			os_free(tls_conf->sig_algs);
