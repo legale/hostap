@@ -54,6 +54,7 @@
 #include <mbedtls/platform_util.h> /* mbedtls_platform_zeroize() */
 #include <mbedtls/ssl.h>
 #include <mbedtls/ssl_ticket.h>
+#include <mbedtls/debug.h>
 #include <mbedtls/x509.h>
 #include <mbedtls/x509_crt.h>
 
@@ -78,6 +79,10 @@
 
 #include "crypto.h"     /* sha256_vector() */
 #include "tls.h"
+
+#if defined(MBEDTLS_LIBPOGOST_C)
+#include <libpogost/gost_tls.h>
+#endif
 
 #ifndef SHA256_DIGEST_LENGTH
 #define SHA256_DIGEST_LENGTH 32
@@ -158,6 +163,7 @@ struct tls_conf {
 #else
 	uint16_t *curves;   /* list of curve ids for mbedtls_ssl_config */
 #endif
+	uint16_t *sig_algs; /* list of sig algs for mbedtls_ssl_conf_sig_algs */
 };
 
 
@@ -192,6 +198,7 @@ struct tls_connection {
 	mbedtls_ssl_context ssl;
 
 	mbedtls_tls_prf_types tls_prf_type;
+	mbedtls_ssl_key_export_type expkey_type;
 	size_t expkey_keyblock_size;
 	size_t expkey_secret_len;
   #if MBEDTLS_VERSION_NUMBER < 0x03000000 /* mbedtls 3.0.0 */
@@ -268,6 +275,19 @@ static void emsgrc(int level, const char * const msg, int rc)
 #define ilog(rc, msg) emsgrc(MSG_INFO,  (msg), (rc))
 
 
+static void tls_mbedtls_dbg_cb(void *ctx, int level,
+				   const char *file, int line,
+				   const char *str)
+{
+	(void)ctx;
+	int wpa_level = (level <= 1) ? MSG_ERROR
+				     : (level == 2) ? MSG_WARNING
+				     : (level == 3) ? MSG_INFO
+				     : MSG_DEBUG;
+	wpa_printf(wpa_level, "MBEDTLS[%d] %s:%d: %s", level, file, line, str);
+}
+
+
 struct tls_conf * tls_conf_init(void *tls_ctx)
 {
 	struct tls_conf *tls_conf = os_zalloc(sizeof(*tls_conf));
@@ -278,6 +298,8 @@ struct tls_conf * tls_conf_init(void *tls_ctx)
 	mbedtls_ssl_config_init(&tls_conf->conf);
 	mbedtls_ssl_conf_rng(&tls_conf->conf,
 			     mbedtls_ctr_drbg_random, tls_ctx_global.ctr_drbg);
+	mbedtls_ssl_conf_dbg(&tls_conf->conf, tls_mbedtls_dbg_cb, NULL);
+	mbedtls_debug_set_threshold(4);
 	mbedtls_x509_crt_init(&tls_conf->ca_cert);
 	mbedtls_x509_crt_init(&tls_conf->client_cert);
 	mbedtls_pk_init(&tls_conf->private_key);
@@ -300,6 +322,7 @@ void tls_conf_deinit(struct tls_conf *tls_conf)
 	mbedtls_pk_free(&tls_conf->private_key);
 	mbedtls_ssl_config_free(&tls_conf->conf);
 	os_free(tls_conf->curves);
+	os_free(tls_conf->sig_algs);
 	os_free(tls_conf->ciphersuites);
 	os_free(tls_conf->subject_match);
 	os_free(tls_conf->altsubject_match);
@@ -1809,17 +1832,47 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf,
 
 		if (type == MBEDTLS_PK_GOST3410_256 ||
 		    type == MBEDTLS_PK_GOST3410_512) {
-			static int gost_ciphersuites[] = {
+						static int gost_ciphersuites[] = {
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
+				MBEDTLS_TLS_GOSTR341112_256_WITH_KUZNYECHIK_MGM_L,
+#endif
 				MBEDTLS_TLS_GOSTR341112_256_WITH_KUZNYECHIK_CTR_OMAC,
 				0
 			};
 
 			wpa_printf(MSG_DEBUG,
-				   "mtls: gost certificate, enable cipher_suite=0x%04x",
-				   MBEDTLS_TLS_GOSTR341112_256_WITH_KUZNYECHIK_CTR_OMAC);
+				   "mtls: gost certificate, enable GOST ciphers");
+			int count = 0;
+			while(gost_ciphersuites[count] != 0) count++;
 			if (!tls_mbedtls_set_ciphersuites(tls_conf,
-							gost_ciphersuites, 2))
+							gost_ciphersuites, count+1))
 				return -1;
+
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
+			/* TLS 1.3: advertise GC256A group (RFC 9367) */
+			static const uint16_t gost_groups[] = {
+				MBEDTLS_SSL_IANA_TLS_GROUP_GC256A,  /* 0x0022 */
+				0
+			};
+			os_free(tls_conf->curves);
+			tls_conf->curves = os_malloc(sizeof(gost_groups));
+			if (tls_conf->curves == NULL)
+				return -1;
+			os_memcpy(tls_conf->curves, gost_groups, sizeof(gost_groups));
+			mbedtls_ssl_conf_groups(&tls_conf->conf, tls_conf->curves);
+
+			/* TLS 1.3: advertise GOST signature scheme gostr34102012_256a (RFC 9367) */
+			static const uint16_t gost_sig_algs[] = {
+				MBEDTLS_TLS1_3_SIG_GOSTR34102012_256A, /* 0x0709 */
+				MBEDTLS_TLS1_3_SIG_NONE
+			};
+			os_free(tls_conf->sig_algs);
+			tls_conf->sig_algs = os_malloc(sizeof(gost_sig_algs));
+			if (tls_conf->sig_algs == NULL)
+				return -1;
+			os_memcpy(tls_conf->sig_algs, gost_sig_algs, sizeof(gost_sig_algs));
+			mbedtls_ssl_conf_sig_algs(&tls_conf->conf, tls_conf->sig_algs);
+#endif /* MBEDTLS_SSL_PROTO_TLS1_3 */
 		}
 	}
 	else if (tls_conf->flags & TLS_CONN_SUITEB) {
@@ -2061,6 +2114,19 @@ static void tls_connection_export_keys_cb(
 {
 	struct tls_connection *conn = p_expkey;
 	conn->tls_prf_type = tls_prf_type;
+	conn->expkey_type = secret_type;
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
+	if (secret_type == MBEDTLS_SSL_KEY_EXPORT_TLS1_3_EXPORTER_SECRET) {
+		if (secret_len > sizeof(conn->expkey_secret)) {
+			emsg(MSG_ERROR, "tls_connection_export_keys_cb secret too long");
+			return;
+		}
+		conn->expkey_secret_len = secret_len;
+		os_memcpy(conn->expkey_secret, secret, secret_len);
+		wpa_printf(MSG_INFO, "mtls: key material exported TLS1_3_EXPORTER_SECRET secret_len=%zu", secret_len);
+		return;
+	}
+#endif
 	if (!tls_prf_type)
 		return;
 	if (secret_len > sizeof(conn->expkey_secret)) {
@@ -2126,6 +2192,20 @@ int tls_connection_export_key(void *tls_ctx, struct tls_connection *conn,
 {
 	/* (EAP-PEAP EAP-TLS EAP-TTLS) */
   #if MBEDTLS_VERSION_NUMBER >= 0x02120000 /* mbedtls 2.18.0 */
+#if defined(MBEDTLS_SSL_PROTO_TLS1_3)
+	if (conn && conn->established &&
+	    conn->expkey_type == MBEDTLS_SSL_KEY_EXPORT_TLS1_3_EXPORTER_SECRET) {
+		int ret = -1;
+#if defined(MBEDTLS_LIBPOGOST_C)
+		if (mbedtls_ssl_get_ciphersuite_id_from_ssl(&conn->ssl) == MBEDTLS_TLS_GOSTR341112_256_WITH_KUZNYECHIK_MGM_L) {
+			ret = gost_tls13_hkdf_expand_label(out, out_len, conn->expkey_secret, label, context, context_len);
+		}
+#endif
+		wpa_printf(MSG_INFO, "mtls: export_key TLS 1.3 label='%s' result=%d", label ? label : "<none>", ret);
+		return ret;
+	}
+#endif
+
 	int ret = (conn && conn->established && conn->tls_prf_type)
 	  ? mbedtls_ssl_tls_prf(conn->tls_prf_type,
 				conn->expkey_secret, conn->expkey_secret_len, label,
