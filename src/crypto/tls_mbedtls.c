@@ -1826,13 +1826,14 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf,
 		if (!tls_mbedtls_set_ciphers(tls_conf, params->openssl_ciphers))
 			return -1;
 	}
+
 	else if (tls_conf->has_client_cert) {
 		mbedtls_pk_type_t type =
 			mbedtls_pk_get_type(&tls_conf->client_cert.pk);
 
 		if (type == MBEDTLS_PK_GOST3410_256 ||
 		    type == MBEDTLS_PK_GOST3410_512) {
-						static int gost_ciphersuites[] = {
+			static int gost_ciphersuites[] = {
 #if defined(MBEDTLS_SSL_PROTO_TLS1_3)
 				MBEDTLS_TLS_GOSTR341112_256_WITH_KUZNYECHIK_MGM_L,
 #endif
@@ -2363,6 +2364,25 @@ static void tls_mbedtls_suiteb_handshake_alert (struct tls_connection *conn)
 }
 
 
+static struct wpabuf * mbedtls_get_appl_data(struct tls_connection *conn, size_t max_len)
+{
+	struct wpabuf *appl_data = wpabuf_alloc(max_len + 100);
+	int res;
+
+	if (appl_data == NULL)
+		return NULL;
+
+	res = mbedtls_ssl_read(&conn->ssl, wpabuf_mhead(appl_data), wpabuf_size(appl_data));
+	if (res <= 0) {
+		wpabuf_free(appl_data);
+		return NULL;
+	}
+	wpabuf_put(appl_data, res);
+	wpa_printf(MSG_INFO, "mtls: appl_data bytes=%d", res);
+	return appl_data;
+}
+
+
 struct wpabuf * tls_connection_handshake(void *tls_ctx,
 					 struct tls_connection *conn,
 					 const struct wpabuf *in_data,
@@ -2446,8 +2466,8 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
 			/* Need to return something to get final TLS ACK. */
 			conn->push_buf = wpabuf_alloc(0);
 
-		if (appl_data /*&& conn->pull_buf && wpabuf_len(conn->pull_buf)*/)
-			*appl_data = NULL; /* RFE: check for application data */
+		if (appl_data && in_data && wpabuf_len(in_data) > 0)
+			*appl_data = mbedtls_get_appl_data(conn, wpabuf_len(in_data));
 		break;
 	case MBEDTLS_ERR_SSL_WANT_WRITE:
 	case MBEDTLS_ERR_SSL_WANT_READ:
