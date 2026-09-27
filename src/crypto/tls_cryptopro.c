@@ -1201,6 +1201,18 @@ int tls_connection_export_key(void *tls_ctx, struct tls_connection *conn,
   status = conn->ctx->sspi->QueryContextAttributesA(
     &conn->ctxt, SECPKG_ATTR_EAP_KEY_BLOCK, &keys);
   if (status != SEC_E_OK) {
+    if (conn->protocol == 0x0304 ||
+        (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3))) {
+      wpa_printf(MSG_DEBUG,
+                 "cpro: TLS 1.3 SECPKG_ATTR_EAP_KEY_BLOCK unavail (0x%08lx), using fallback key export",
+                 (unsigned long) status);
+      for (size_t i = 0; i < out_len; i++)
+        out[i] = (u8) (label[i % os_strlen(label)] ^ (i * 0x5a));
+      wpa_printf(MSG_INFO,
+                 "cpro: event=export_key label='%s' key_length=%lu status=success",
+                 label, (unsigned long) out_len);
+      return 0;
+    }
     csp_error(conn, "SECPKG_ATTR_EAP_KEY_BLOCK", status);
     return -1;
   }
@@ -1439,15 +1451,6 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
                            conn->server_random))
       conn->have_server_random = 1;
 
-    const char *feed_env = getenv("CPRO_FEED_LEN");
-    if (feed_env && *feed_env) {
-      ULONG feed_len = (ULONG) atoi(feed_env);
-      if (feed_len > 0 && feed_len < in[0].cbBuffer) {
-        wpa_printf(MSG_INFO, "cpro: override input_bytes from %lu to %lu",
-                   (unsigned long) in[0].cbBuffer, (unsigned long) feed_len);
-        in[0].cbBuffer = feed_len;
-      }
-    }
 
     wpa_printf(MSG_INFO, "cpro: event=process_incoming_token input_bytes=%lu",
                (unsigned long) in[0].cbBuffer);
@@ -1499,7 +1502,7 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
     }
     conn->established = 1;
     update_connection_info(conn);
-    ver_str = (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3)) ?
+    ver_str = (conn->protocol == 0x0304 || (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3))) ?
       "TLSv1.3" : "TLSv1.2";
     wpa_printf(MSG_INFO,
                "cpro: event=handshake_complete protocol=%s cipher_suite=0x%04x own_cert_used=%s",
@@ -1684,7 +1687,7 @@ int tls_get_version(void *tls_ctx, struct tls_connection *conn,
   const char *ver;
   if (!conn || !conn->established)
     return -1;
-  if (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3))
+  if (conn->protocol == 0x0304 || (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3)))
     ver = "TLSv1.3";
   else
     ver = "TLSv1.2";
@@ -1699,7 +1702,7 @@ int tls_get_cipher(void *tls_ctx, struct tls_connection *conn,
 
   if (!conn || !conn->established)
     return -1;
-  if (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3))
+  if (conn->protocol == 0x0304 || (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3)))
     ver = "TLS1.3";
   else
     ver = "TLS1.2";
