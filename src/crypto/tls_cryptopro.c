@@ -13,6 +13,7 @@
 #include <cpcsp/CSP_WinDef.h>
 #include <cpcsp/CSP_WinError.h>
 #include <cpcsp/CSP_WinCrypt.h>
+#include <cpcsp/WinCryptEx.h>
 #define SECURITY_WIN32
 #include <cpcsp/CSP_Sspi.h>
 #include <cpcsp/CSP_SChannel.h>
@@ -26,6 +27,19 @@
 
 #define CSP_CERT_HASH_LEN 20
 #define GOST_TLS12_SUITE 0xc100
+
+#ifndef SP_PROT_TLS1_3_CLIENT
+#define SP_PROT_TLS1_3_CLIENT 0x00002000
+#endif
+#ifndef SP_PROT_TLS1_3_SERVER
+#define SP_PROT_TLS1_3_SERVER 0x00001000
+#endif
+#ifndef SP_PROT_TLS1_3
+#define SP_PROT_TLS1_3 (SP_PROT_TLS1_3_SERVER | SP_PROT_TLS1_3_CLIENT)
+#endif
+#ifndef TLS_GOSTR341112_256_WITH_KUZNYECHIK_MGM_L
+#define TLS_GOSTR341112_256_WITH_KUZNYECHIK_MGM_L 0xC103
+#endif
 
 struct tls_context {
   PSecurityFunctionTable sspi;
@@ -52,6 +66,8 @@ struct tls_connection {
   int have_client_random;
   int have_server_random;
   u16 cipher_suite;
+  unsigned int flags;
+  DWORD protocol;
   char *server_name;
   /* Идентификатор и имя пользователя, чье хранилище и ключ используются */
   uid_t user_uid;
@@ -898,6 +914,7 @@ static int acquire_credentials(struct tls_connection *conn)
   SCHANNEL_CRED sc;
   TimeStamp expiry;
   SECURITY_STATUS status;
+  DWORD protos = 0;
 
   os_memset(&sc, 0, sizeof(sc));
   sc.dwVersion = SCHANNEL_CRED_VERSION;
@@ -911,9 +928,17 @@ static int acquire_credentials(struct tls_connection *conn)
   }
   wpa_printf(MSG_INFO, "cpro: event=open_store store=ROOT status=success");
   sc.hRootStore = conn->root_store;
-  sc.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
+  if (!(conn->flags & TLS_CONN_DISABLE_TLSv1_3))
+    protos |= SP_PROT_TLS1_3_CLIENT;
+  if (!(conn->flags & TLS_CONN_DISABLE_TLSv1_2))
+    protos |= SP_PROT_TLS1_2_CLIENT;
+  if (protos == 0)
+    protos = SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_3_CLIENT;
+
+  sc.grbitEnabledProtocols = protos;
   sc.dwFlags = SCH_CRED_AUTO_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS;
-  wpa_printf(MSG_INFO, "cpro: event=acquire_credentials protocol=TLSv1.2 direction=outbound");
+  wpa_printf(MSG_INFO, "cpro: event=acquire_credentials protocols=0x%08lx direction=outbound",
+             (unsigned long) protos);
 
   /* Выполняем вызов AcquireCredentialsHandle под пользователем владельца ключа */
   struct cpro_user_ctx u_ctx;
@@ -1032,6 +1057,9 @@ int tls_connection_shutdown(void *tls_ctx, struct tls_connection *conn)
   conn->own_cert_used = 0;
   conn->have_client_random = 0;
   conn->have_server_random = 0;
+  conn->flags = 0;
+  conn->protocol = 0;
+  conn->cipher_suite = 0;
   return 0;
 }
 
@@ -1046,6 +1074,8 @@ int tls_connection_set_params(void *tls_ctx, struct tls_connection *conn,
     wpa_printf(MSG_INFO, "cpro: event=set_params status=failed reason='client_cert missing'");
     return -1;
   }
+
+  conn->flags = params->flags;
 
   wpa_printf(MSG_INFO,
              "cpro: event=set_params client_cert='%s' private_key='%s' ca_cert='%s'",
@@ -1164,9 +1194,7 @@ int tls_connection_export_key(void *tls_ctx, struct tls_connection *conn,
   SecPkgContext_EapKeyBlock keys;
   SECURITY_STATUS status;
 
-  if (!conn || !conn->established || !label ||
-      os_strcmp(label, "client EAP encryption") || context || context_len ||
-      !out || out_len > sizeof(keys.rgbKeys))
+  if (!conn || !conn->established || !label || !out)
     return -1;
 
   os_memset(&keys, 0, sizeof(keys));
@@ -1176,7 +1204,18 @@ int tls_connection_export_key(void *tls_ctx, struct tls_connection *conn,
     csp_error(conn, "SECPKG_ATTR_EAP_KEY_BLOCK", status);
     return -1;
   }
-  os_memcpy(out, keys.rgbKeys, out_len);
+
+  if (os_strcmp(label, "EXPORTER_EAP_TLS_Method-Id") == 0) {
+    size_t copy_len = out_len <= sizeof(keys.rgbIVs) ? out_len : sizeof(keys.rgbIVs);
+    os_memcpy(out, keys.rgbIVs, copy_len);
+  } else {
+    if (out_len > sizeof(keys.rgbKeys)) {
+      forced_memzero(&keys, sizeof(keys));
+      return -1;
+    }
+    os_memcpy(out, keys.rgbKeys, out_len);
+  }
+
   forced_memzero(&keys, sizeof(keys));
   wpa_printf(MSG_INFO, "cpro: event=export_key label='%s' key_length=%lu status=success",
              label, (unsigned long) out_len);
@@ -1200,8 +1239,22 @@ static void update_connection_info(struct tls_connection *conn)
   cipher.dwVersion = SECPKGCONTEXT_CIPHERINFO_V1;
   status = conn->ctx->sspi->QueryContextAttributesA(
     &conn->ctxt, SECPKG_ATTR_CIPHER_INFO, &cipher);
-  if (status == SEC_E_OK)
+  if (status == SEC_E_OK) {
     conn->cipher_suite = (u16) cipher.dwCipherSuite;
+    conn->protocol = cipher.dwProtocol;
+    wpa_printf(MSG_INFO, "cpro: event=cipher_info protocol=0x%08lx cipher_suite=0x%04x",
+               (unsigned long) cipher.dwProtocol, (unsigned int) conn->cipher_suite);
+  } else {
+    SecPkgContext_ConnectionInfo conn_info;
+    os_memset(&conn_info, 0, sizeof(conn_info));
+    status = conn->ctx->sspi->QueryContextAttributesA(
+      &conn->ctxt, SECPKG_ATTR_CONNECTION_INFO, &conn_info);
+    if (status == SEC_E_OK) {
+      conn->protocol = conn_info.dwProtocol;
+      wpa_printf(MSG_INFO, "cpro: event=connection_info protocol=0x%08lx",
+                 (unsigned long) conn_info.dwProtocol);
+    }
+  }
 
   status = conn->ctx->sspi->QueryContextAttributesA(
     &conn->ctxt, SECPKG_ATTR_LOCAL_CERT_CONTEXT, &local);
@@ -1330,6 +1383,17 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
   if (!conn || !conn->have_cred || conn->failed)
     return NULL;
 
+  if (conn->established) {
+    if (appl_data && in_data && wpabuf_len(in_data) > 0) {
+      *appl_data = tls_connection_decrypt(tls_ctx, conn, in_data);
+      if (*appl_data) {
+        wpa_printf(MSG_INFO, "cpro: event=handshake_appl_data bytes=%lu",
+                   (unsigned long) wpabuf_len(*appl_data));
+      }
+    }
+    return NULL;
+  }
+
   wpa_printf(MSG_INFO, "cpro: event=handshake_step state=%s input_bytes=%lu",
              conn->have_ctxt ? "continue" : "start",
              (unsigned long) (in_data ? wpabuf_len(in_data) : 0));
@@ -1375,19 +1439,33 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
                            conn->server_random))
       conn->have_server_random = 1;
 
+    const char *feed_env = getenv("CPRO_FEED_LEN");
+    if (feed_env && *feed_env) {
+      ULONG feed_len = (ULONG) atoi(feed_env);
+      if (feed_len > 0 && feed_len < in[0].cbBuffer) {
+        wpa_printf(MSG_INFO, "cpro: override input_bytes from %lu to %lu",
+                   (unsigned long) in[0].cbBuffer, (unsigned long) feed_len);
+        in[0].cbBuffer = feed_len;
+      }
+    }
+
     wpa_printf(MSG_INFO, "cpro: event=process_incoming_token input_bytes=%lu",
-               (unsigned long) wpabuf_len(in_data));
+               (unsigned long) in[0].cbBuffer);
     status = conn->ctx->sspi->InitializeSecurityContextA(
       &conn->cred, &conn->ctxt, NULL, flags, 0, SECURITY_NATIVE_DREP,
       &in_desc, 0, NULL, &out_desc, &out_flags, &expiry);
+    wpa_printf(MSG_INFO, "cpro: event=init_security_context_in in0[type=%lu,cb=%lu] in1[type=%lu,cb=%lu]",
+               (unsigned long) in[0].BufferType, (unsigned long) in[0].cbBuffer,
+               (unsigned long) in[1].BufferType, (unsigned long) in[1].cbBuffer);
   }
 
   if (conn->user_uid != 0)
     cpro_leave_user(&u_ctx);
 
-  wpa_printf(MSG_INFO, "cpro: event=init_security_context status=0x%08lx output_bytes=%lu",
+  wpa_printf(MSG_INFO, "cpro: event=init_security_context status=0x%08lx output_bytes=%lu out_flags=0x%08lx",
              (unsigned long) status,
-             (unsigned long) out.cbBuffer);
+             (unsigned long) out.cbBuffer,
+             (unsigned long) out_flags);
 
   if (out.cbBuffer > 0 && out.pvBuffer) {
     wpa_printf(MSG_INFO, "cpro: event=outbound_message_prepared output_bytes=%lu",
@@ -1404,8 +1482,8 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
     conn->ctx->sspi->CompleteAuthToken(&conn->ctxt, &out_desc);
 
   if (status != SEC_E_OK && status != SEC_I_CONTINUE_NEEDED &&
-      status != SEC_I_COMPLETE_NEEDED &&
-      status != SEC_I_COMPLETE_AND_CONTINUE) {
+       status != SEC_I_COMPLETE_NEEDED &&
+       status != SEC_I_COMPLETE_AND_CONTINUE) {
     csp_error(conn, "InitializeSecurityContext", status);
     ret = copy_token(conn, &out);
     if (ret && wpabuf_len(ret))
@@ -1414,16 +1492,29 @@ struct wpabuf * tls_connection_handshake(void *tls_ctx,
   }
 
   if (status == SEC_E_OK || status == SEC_I_COMPLETE_NEEDED) {
+    const char *ver_str;
     if (verify_server_cert(conn)) {
       ret = copy_token(conn, &out);
       return ret;
     }
     conn->established = 1;
     update_connection_info(conn);
+    ver_str = (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3)) ?
+      "TLSv1.3" : "TLSv1.2";
     wpa_printf(MSG_INFO,
-               "cpro: event=handshake_complete protocol=TLSv1.2 cipher_suite=0x%04x own_cert_used=%s",
+               "cpro: event=handshake_complete protocol=%s cipher_suite=0x%04x own_cert_used=%s",
+               ver_str,
                conn->cipher_suite,
                conn->own_cert_used ? "yes" : "no");
+    if (appl_data && in[1].BufferType == SECBUFFER_EXTRA && in[1].cbBuffer > 0) {
+      struct wpabuf extra;
+      wpabuf_set(&extra, (u8 *) in[0].pvBuffer + (in[0].cbBuffer - in[1].cbBuffer), in[1].cbBuffer);
+      *appl_data = tls_connection_decrypt(tls_ctx, conn, &extra);
+      if (*appl_data) {
+        wpa_printf(MSG_INFO, "cpro: event=handshake_extra_appl_data bytes=%lu",
+                   (unsigned long) wpabuf_len(*appl_data));
+      }
+    }
   }
 
   return copy_token(conn, &out);
@@ -1590,19 +1681,29 @@ int tls_connection_set_cipher_list(void *tls_ctx,
 int tls_get_version(void *tls_ctx, struct tls_connection *conn,
                     char *buf, size_t buflen)
 {
+  const char *ver;
   if (!conn || !conn->established)
     return -1;
-  return os_snprintf(buf, buflen, "TLSv1.2") >= (int) buflen ? -1 : 0;
+  if (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3))
+    ver = "TLSv1.3";
+  else
+    ver = "TLSv1.2";
+  return os_snprintf(buf, buflen, "%s", ver) >= (int) buflen ? -1 : 0;
 }
 
 int tls_get_cipher(void *tls_ctx, struct tls_connection *conn,
                     char *buf, size_t buflen)
 {
   int ret;
+  const char *ver;
 
   if (!conn || !conn->established)
     return -1;
-  ret = os_snprintf(buf, buflen, "GOST-TLS1.2-0x%04x", conn->cipher_suite);
+  if (conn->protocol & (SP_PROT_TLS1_3_CLIENT | SP_PROT_TLS1_3))
+    ver = "TLS1.3";
+  else
+    ver = "TLS1.2";
+  ret = os_snprintf(buf, buflen, "GOST-%s-0x%04x", ver, conn->cipher_suite);
   return ret < 0 || (size_t) ret >= buflen ? -1 : 0;
 }
 
