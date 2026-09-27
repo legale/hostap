@@ -163,7 +163,7 @@ struct tls_conf {
 #else
 	uint16_t *curves;   /* list of curve ids for mbedtls_ssl_config */
 #endif
-	uint16_t *sig_algs; /* list of sig algs for mbedtls_ssl_conf_sig_algs */
+
 };
 
 
@@ -322,7 +322,7 @@ void tls_conf_deinit(struct tls_conf *tls_conf)
 	mbedtls_pk_free(&tls_conf->private_key);
 	mbedtls_ssl_config_free(&tls_conf->conf);
 	os_free(tls_conf->curves);
-	os_free(tls_conf->sig_algs);
+
 	os_free(tls_conf->ciphersuites);
 	os_free(tls_conf->subject_match);
 	os_free(tls_conf->altsubject_match);
@@ -1862,19 +1862,7 @@ static int tls_mbedtls_set_params(struct tls_conf *tls_conf,
 			os_memcpy(tls_conf->curves, gost_groups, sizeof(gost_groups));
 			mbedtls_ssl_conf_groups(&tls_conf->conf, tls_conf->curves);
 
-			/* GOST signature schemes: TLS 1.3 (0x0709) and TLS 1.2 (0x0840, 0x0841) */
-			static const uint16_t gost_sig_algs[] = {
-				MBEDTLS_TLS1_3_SIG_GOSTR34102012_256A, /* 0x0709 */
-				(MBEDTLS_SSL_HASH_INTRINSIC << 8) | MBEDTLS_SSL_SIG_GOST256, /* 0x0840 */
-				(MBEDTLS_SSL_HASH_INTRINSIC << 8) | MBEDTLS_SSL_SIG_GOST512, /* 0x0841 */
-				MBEDTLS_TLS1_3_SIG_NONE
-			};
-			os_free(tls_conf->sig_algs);
-			tls_conf->sig_algs = os_malloc(sizeof(gost_sig_algs));
-			if (tls_conf->sig_algs == NULL)
-				return -1;
-			os_memcpy(tls_conf->sig_algs, gost_sig_algs, sizeof(gost_sig_algs));
-			mbedtls_ssl_conf_sig_algs(&tls_conf->conf, tls_conf->sig_algs);
+
 #endif /* MBEDTLS_SSL_PROTO_TLS1_3 */
 		}
 	}
