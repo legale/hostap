@@ -936,7 +936,7 @@ static int acquire_credentials(struct tls_connection *conn)
     protos = SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_3_CLIENT;
 
   sc.grbitEnabledProtocols = protos;
-  sc.dwFlags = SCH_CRED_AUTO_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS;
+  sc.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION | SCH_CRED_NO_DEFAULT_CREDS;
   wpa_printf(MSG_INFO, "cpro: event=acquire_credentials protocols=0x%08lx direction=outbound",
              (unsigned long) protos);
 
