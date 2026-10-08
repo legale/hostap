@@ -1584,6 +1584,10 @@ static const struct blobmsg_policy addr_policy[] = {
 	{ "address", BLOBMSG_TYPE_STRING }
 };
 
+static const struct blobmsg_policy wifitax_policy[] = {
+	{ "mac", BLOBMSG_TYPE_STRING }
+};
+
 static bool
 hostapd_add_b64_data(const char *name, const struct wpabuf *buf)
 {
@@ -1625,6 +1629,52 @@ hostapd_bss_get_sta_ies(struct ubus_context *ctx, struct ubus_object *obj,
 
 	return 0;
 }
+
+static int
+hostapd_bss_get_wifitax(struct ubus_context *ctx, struct ubus_object *obj,
+			struct ubus_request_data *req, const char *method,
+			struct blob_attr *msg)
+{
+	struct hostapd_data *hapd = container_of(obj, struct hostapd_data, ubus.obj);
+	struct blob_attr *tb;
+	u8 addr[ETH_ALEN];
+	char signature[TAXONOMY_MAX_SIGNATURE_LEN + 1];
+	const char *status;
+	int ret;
+
+	blobmsg_parse(wifitax_policy, ARRAY_SIZE(wifitax_policy), &tb,
+		      blobmsg_data(msg), blobmsg_len(msg));
+	if (!tb || hwaddr_aton(blobmsg_get_string(tb), addr))
+		return UBUS_STATUS_INVALID_ARGUMENT;
+
+	ret = taxonomy_get_sta_wifitax(hapd, addr, signature, sizeof(signature));
+	switch (ret) {
+	case TAXONOMY_WIFITAX_COMPLETE:
+		status = "complete";
+		break;
+	case TAXONOMY_WIFITAX_MISSING_PROBE:
+		status = "missing_probe";
+		break;
+	case TAXONOMY_WIFITAX_MISSING_ASSOC:
+		status = "missing_assoc";
+		break;
+	case TAXONOMY_WIFITAX_INVALID_IE:
+		status = "invalid_ie";
+		break;
+	case TAXONOMY_WIFITAX_NOT_FOUND:
+		return UBUS_STATUS_NOT_FOUND;
+	default:
+		return UBUS_STATUS_UNKNOWN_ERROR;
+	}
+
+	blob_buf_init(&b, 0);
+	blobmsg_add_string(&b, "status", status);
+	if (ret == TAXONOMY_WIFITAX_COMPLETE)
+		blobmsg_add_string(&b, "signature", signature);
+	ubus_send_reply(ctx, req, b.head);
+
+	return 0;
+}
 #endif
 
 
@@ -1633,6 +1683,7 @@ static const struct ubus_method bss_methods[] = {
 	UBUS_METHOD_NOARG("get_clients", hostapd_bss_get_clients),
 #ifdef CONFIG_TAXONOMY
 	UBUS_METHOD("get_sta_ies", hostapd_bss_get_sta_ies, addr_policy),
+	UBUS_METHOD("get_wifitax", hostapd_bss_get_wifitax, wifitax_policy),
 #endif
 	UBUS_METHOD_NOARG("get_status", hostapd_bss_get_status),
 	UBUS_METHOD("del_client", hostapd_bss_del_client, del_policy),

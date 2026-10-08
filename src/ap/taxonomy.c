@@ -276,6 +276,32 @@ int retrieve_sta_taxonomy(const struct hostapd_data *hapd,
 }
 
 
+int taxonomy_get_sta_wifitax(struct hostapd_data *hapd, const u8 *addr,
+			      char *signature, size_t signature_len)
+{
+	struct sta_info *sta;
+	int ret;
+
+	if (!signature || signature_len == 0)
+		return TAXONOMY_WIFITAX_INVALID_IE;
+	signature[0] = '\0';
+	sta = ap_get_sta(hapd, addr);
+	if (!sta)
+		return TAXONOMY_WIFITAX_NOT_FOUND;
+	if (!sta->probe_ie_taxonomy)
+		return TAXONOMY_WIFITAX_MISSING_PROBE;
+	if (!sta->assoc_ie_taxonomy)
+		return TAXONOMY_WIFITAX_MISSING_ASSOC;
+
+	ret = retrieve_sta_taxonomy(hapd, sta, signature, signature_len);
+	if (ret <= 0) {
+		signature[0] = '\0';
+		return TAXONOMY_WIFITAX_INVALID_IE;
+	}
+	return TAXONOMY_WIFITAX_COMPLETE;
+}
+
+
 void taxonomy_sta_info_probe_req(const struct hostapd_data *hapd,
 				 struct sta_info *sta,
 				 const u8 *ie, size_t ie_len)
