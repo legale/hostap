@@ -9,6 +9,8 @@
 #ifndef TAXONOMY_H
 #define TAXONOMY_H
 
+#define TAXONOMY_MAX_SIGNATURE_LEN 4096
+
 void taxonomy_sta_info_probe_req(const struct hostapd_data *hapd,
 				 struct sta_info *sta,
 				 const u8 *ie, size_t ie_len);

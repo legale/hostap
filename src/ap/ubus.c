@@ -268,6 +268,9 @@ hostapd_bss_get_clients(struct ubus_context *ctx, struct ubus_object *obj,
 	for (sta = hapd->sta_list; sta; sta = sta->next) {
 		void *r;
 		int i;
+#ifdef CONFIG_TAXONOMY
+		char signature[TAXONOMY_MAX_SIGNATURE_LEN + 1];
+#endif
 
 		sprintf(mac_buf, MACSTR, MAC2STR(sta->addr));
 		c = blobmsg_open_table(&b, mac_buf);
@@ -295,9 +298,19 @@ hostapd_bss_get_clients(struct ubus_context *ctx, struct ubus_object *obj,
 
 		blobmsg_add_u32(&b, "aid", sta->aid);
 #ifdef CONFIG_TAXONOMY
-		r = blobmsg_alloc_string_buffer(&b, "signature", 1024);
-		if (retrieve_sta_taxonomy(hapd, sta, r, 1024) > 0)
-			blobmsg_add_string_buffer(&b);
+		if (!sta->probe_ie_taxonomy) {
+			blobmsg_add_string(&b, "signature_status", "missing_probe");
+		} else if (!sta->assoc_ie_taxonomy) {
+			blobmsg_add_string(&b, "signature_status", "missing_assoc");
+		} else {
+			if (retrieve_sta_taxonomy(hapd, sta, signature,
+							TAXONOMY_MAX_SIGNATURE_LEN + 1) > 0) {
+				blobmsg_add_string(&b, "signature", signature);
+				blobmsg_add_string(&b, "signature_status", "complete");
+			} else {
+				blobmsg_add_string(&b, "signature_status", "invalid_ie");
+			}
+		}
 #endif
 
 		/* Driver information */

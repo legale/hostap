@@ -82,7 +82,7 @@ static int get_wps_name(char *name, size_t name_len,
 }
 
 
-static void ie_to_string(char *fstr, size_t fstr_len, const struct wpabuf *ies)
+static int ie_to_string(char *fstr, size_t fstr_len, const struct wpabuf *ies)
 {
 	char *fpos = fstr;
 	char *fend = fstr + fstr_len;
@@ -104,6 +104,9 @@ static void ie_to_string(char *fstr, size_t fstr_len, const struct wpabuf *ies)
 	size_t ie_len;
 	int ret;
 
+	if (!fstr || fstr_len == 0 || !ies)
+		return -1;
+
 	os_memset(htcap, 0, sizeof(htcap));
 	os_memset(htagg, 0, sizeof(htagg));
 	os_memset(htmcs, 0, sizeof(htmcs));
@@ -116,7 +119,7 @@ static void ie_to_string(char *fstr, size_t fstr_len, const struct wpabuf *ies)
 	*fpos = '\0';
 
 	if (!ies)
-		return;
+		return -1;
 	ie = wpabuf_head(ies);
 	ie_len = wpabuf_len(ies);
 
@@ -129,7 +132,7 @@ static void ie_to_string(char *fstr, size_t fstr_len, const struct wpabuf *ies)
 		ie_len -= 2;
 
 		if (elen > ie_len)
-			break;
+			goto fail;
 
 		if (id == WLAN_EID_VENDOR_SPECIFIC && elen >= 4) {
 			/* Vendor specific */
@@ -232,7 +235,9 @@ static void ie_to_string(char *fstr, size_t fstr_len, const struct wpabuf *ies)
 	if (os_snprintf_error(fend - fpos, ret)) {
 	fail:
 		fstr[0] = '\0';
+		return -1;
 	}
+	return 0;
 }
 
 
@@ -244,23 +249,29 @@ int retrieve_sta_taxonomy(const struct hostapd_data *hapd,
 
 	if (!sta->probe_ie_taxonomy || !sta->assoc_ie_taxonomy)
 		return 0;
+	if (!buf || buflen == 0)
+		return -1;
 
 	ret = os_snprintf(buf, buflen, "wifi4|probe:");
 	if (os_snprintf_error(buflen, ret))
-		return 0;
+		return -1;
 	pos = buf + ret;
 	end = buf + buflen;
 
-	ie_to_string(pos, end - pos, sta->probe_ie_taxonomy);
+	if (ie_to_string(pos, end - pos, sta->probe_ie_taxonomy) < 0)
+		return -1;
 	pos = os_strchr(pos, '\0');
 	if (pos >= end)
-		return 0;
+		return -1;
 	ret = os_snprintf(pos, end - pos, "|assoc:");
 	if (os_snprintf_error(end - pos, ret))
-		return 0;
+		return -1;
 	pos += ret;
-	ie_to_string(pos, end - pos, sta->assoc_ie_taxonomy);
+	if (ie_to_string(pos, end - pos, sta->assoc_ie_taxonomy) < 0)
+		return -1;
 	pos = os_strchr(pos, '\0');
+	if (!pos || pos >= end)
+		return -1;
 	return pos - buf;
 }
 
