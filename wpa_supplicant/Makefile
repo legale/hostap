@@ -1299,9 +1299,12 @@ endif
 
 ifeq ($(CONFIG_TLS), mbedtls)
 CFLAGS += -I../../mbedtls/include
+LIBS += -L../../mbedtls/library
+LIBS_p += -L../../mbedtls/library
 ifndef CONFIG_CRYPTO
 CONFIG_CRYPTO=mbedtls
 endif
+
 
 ifdef TLS_FUNCS
 ifdef CONFIG_TLS_CRYPTOPRO
