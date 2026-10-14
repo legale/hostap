@@ -10509,3 +10509,16 @@ void wpas_configure_frame_filters(struct wpa_supplicant *wpa_s)
 
 	wpa_drv_configure_frame_filters(wpa_s, filter);
 }
+
+#ifdef CONFIG_EMBEDDED_8021X
+enum wpa_states wpas_get_state(struct wpa_supplicant *wpa_s)
+{
+	return wpa_s ? wpa_s->wpa_state : WPA_DISCONNECTED;
+}
+
+struct wpa_config * wpas_get_conf(struct wpa_supplicant *wpa_s)
+{
+	return wpa_s ? wpa_s->conf : NULL;
+}
+#endif /* CONFIG_EMBEDDED_8021X */
+
