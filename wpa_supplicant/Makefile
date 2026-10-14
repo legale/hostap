@@ -1315,6 +1315,7 @@ OBJS_priv += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
 ifeq ($(CONFIG_CRYPTO), mbedtls)
 LIBS += -lmbedcrypto
 LIBS_p += -lmbedcrypto
+CFLAGS += -DCRYPTO_MBEDTLS_CRYPTO_RSA -DCRYPTO_MBEDTLS_CRYPTO_EC -DCRYPTO_MBEDTLS_CRYPTO_BIGNUM
 ifdef CONFIG_POGOST
 LIBS += -lpogost
 LIBS_p += -lpogost
@@ -2171,6 +2172,10 @@ include ../src/objs.mk
 wpa_supplicant: $(BCHECK) $(OBJS) $(EXTRA_progs)
 	$(Q)$(LDO) $(LDFLAGS) -o wpa_supplicant $(OBJS) $(LIBS) $(EXTRALIBS)
 	@$(E) "  LD " $@
+
+libwpa_supplicant.a: $(BCHECK) $(filter-out $(CONFIG_MAIN).o, $(OBJS))
+	@$(E) "  AR " $@
+	$(Q)$(AR) crs $@ $(filter-out $(CONFIG_MAIN).o, $(OBJS))
 
 _OBJS_VAR := OBJS_t
 include ../src/objs.mk
