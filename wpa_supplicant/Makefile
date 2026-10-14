@@ -1315,8 +1315,10 @@ OBJS_priv += ../src/crypto/crypto_$(CONFIG_CRYPTO).o
 ifeq ($(CONFIG_CRYPTO), mbedtls)
 LIBS += -lmbedcrypto
 LIBS_p += -lmbedcrypto
+ifdef CONFIG_POGOST
 LIBS += -lpogost
 LIBS_p += -lpogost
+endif
 # XXX: create a config option?
 ifndef CONFIG_TLS_CRYPTOPRO
 CFLAGS += -DCRYPTO_RSA_OAEP_SHA256
