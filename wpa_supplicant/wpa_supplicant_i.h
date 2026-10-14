@@ -73,6 +73,10 @@ struct wpa_interface {
 	 * used.
 	 */
 	const char *confanother;
+#ifdef CONFIG_EMBEDDED_8021X
+	const void *conf_mem;
+	size_t conf_mem_len;
+#endif
 
 	/**
 	 * ctrl_interface - Control interface parameter

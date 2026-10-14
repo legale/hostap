@@ -7914,6 +7914,17 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		   iface->ctrl_interface ? iface->ctrl_interface : "N/A",
 		   iface->bridge_ifname ? iface->bridge_ifname : "N/A");
 
+#ifdef CONFIG_EMBEDDED_8021X
+	if (iface->conf_mem && iface->conf_mem_len > 0) {
+		wpa_s->conf = wpa_config_read_mem(iface->conf_mem,
+						  iface->conf_mem_len, NULL);
+		if (wpa_s->conf == NULL) {
+			wpa_printf(MSG_ERROR,
+				   "Failed to read or parse in-memory configuration.");
+			return -1;
+		}
+	} else
+#endif /* CONFIG_EMBEDDED_8021X */
 	if (iface->confname) {
 #ifdef CONFIG_BACKEND_FILE
 		wpa_s->confname = os_rel2abs_path(iface->confname);

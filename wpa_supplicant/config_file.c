@@ -503,6 +503,151 @@ struct wpa_config * wpa_config_read(const char *name, struct wpa_config *cfgp,
 }
 
 
+#ifdef CONFIG_EMBEDDED_8021X
+struct wpa_config * wpa_config_read_mem(const void *mem, size_t len,
+					struct wpa_config *cfgp)
+{
+	FILE *f;
+	char buf[1024], *pos;
+	int errors = 0, line = 0;
+	struct wpa_ssid *ssid, *tail, *head;
+	struct wpa_cred *cred, *cred_tail, *cred_head;
+	struct wpa_dev_ik *identity, *identity_tail, *identity_head;
+	struct wpa_config *config;
+	static int id = 0;
+	static int cred_id = 0;
+	static int base_identity_id = 0;
+	int identity_id = base_identity_id;
+
+	if (mem == NULL || len == 0)
+		return NULL;
+	if (cfgp)
+		config = cfgp;
+	else
+		config = wpa_config_alloc_empty(NULL, NULL);
+	if (config == NULL) {
+		wpa_printf(MSG_ERROR, "Failed to allocate config file structure");
+		return NULL;
+	}
+	tail = head = config->ssid;
+	while (tail && tail->next)
+		tail = tail->next;
+	cred_tail = cred_head = config->cred;
+	while (cred_tail && cred_tail->next)
+		cred_tail = cred_tail->next;
+	identity_tail = identity_head = config->identity;
+	while (identity_tail && identity_tail->next)
+		identity_tail = identity_tail->next;
+
+	wpa_printf(MSG_DEBUG, "Reading configuration from memory buffer (%zu bytes)", len);
+	f = fmemopen((void *)mem, len, "r");
+	if (f == NULL) {
+		wpa_printf(MSG_ERROR, "Failed to fmemopen config memory buffer: %s",
+			   strerror(errno));
+		if (config != cfgp)
+			os_free(config);
+		return NULL;
+	}
+
+	while (wpa_config_get_line(buf, sizeof(buf), f, &line, &pos)) {
+#ifndef WPA_IGNORE_CONFIG_ERRORS
+		if (errors)
+			break;
+#endif /* WPA_IGNORE_CONFIG_ERRORS */
+
+		if (os_strcmp(pos, "network={") == 0) {
+			ssid = wpa_config_read_network(f, &line, id++);
+			if (ssid == NULL) {
+				wpa_printf(MSG_ERROR, "Line %d: failed to "
+					   "parse network block.", line);
+				errors++;
+				continue;
+			}
+			ssid->go_dik_id += base_identity_id;
+			ssid->ro = false;
+			if (head == NULL) {
+				head = tail = ssid;
+			} else {
+				tail->next = ssid;
+				tail = ssid;
+			}
+			if (wpa_config_add_prio_network(config, ssid)) {
+				wpa_printf(MSG_ERROR, "Line %d: failed to add "
+					   "network block to priority list.",
+					   line);
+				errors++;
+				continue;
+			}
+		} else if (os_strcmp(pos, "cred={") == 0) {
+			cred = wpa_config_read_cred(f, &line, cred_id++);
+			if (cred == NULL) {
+				wpa_printf(MSG_ERROR, "Line %d: failed to "
+					   "parse cred block.", line);
+				errors++;
+				continue;
+			}
+			if (cred_head == NULL) {
+				cred_head = cred_tail = cred;
+			} else {
+				cred_tail->next = cred;
+				cred_tail = cred;
+			}
+#ifndef CONFIG_NO_CONFIG_BLOBS
+		} else if (os_strncmp(pos, "blob-base64-", 12) == 0) {
+			if (wpa_config_process_blob(config, f, &line, pos + 12) < 0) {
+				wpa_printf(MSG_ERROR, "Line %d: failed to "
+					   "process blob.", line);
+				errors++;
+				continue;
+			}
+#endif /* CONFIG_NO_CONFIG_BLOBS */
+		} else if (os_strcmp(pos, "identity={") == 0) {
+			identity = wpa_config_read_identity(f, &line,
+							    ++identity_id);
+			if (!identity) {
+				wpa_printf(MSG_ERROR, "Line %d: failed to "
+					   "parse identity block.", line);
+				errors++;
+				continue;
+			}
+			if (!identity_head) {
+				identity_head = identity_tail = identity;
+			} else {
+				identity_tail->next = identity;
+				identity_tail = identity;
+			}
+		} else if (wpa_config_process_global(config, pos, line, true) < 0) {
+			wpa_printf(MSG_ERROR,
+				   "Line %d: Invalid configuration line '%s'.",
+				   line, pos);
+			errors++;
+			continue;
+		}
+	}
+
+	fclose(f);
+
+	config->ssid = head;
+	wpa_config_debug_dump_networks(config);
+	config->cred = cred_head;
+	config->identity = identity_head;
+
+	base_identity_id = identity_id;
+
+#ifndef WPA_IGNORE_CONFIG_ERRORS
+	if (errors) {
+		if (config != cfgp)
+			wpa_config_free(config);
+		config = NULL;
+		head = NULL;
+	}
+#endif /* WPA_IGNORE_CONFIG_ERRORS */
+
+	return config;
+}
+#endif /* CONFIG_EMBEDDED_8021X */
+
+
 #ifndef CONFIG_NO_CONFIG_WRITE
 
 static void write_str(FILE *f, const char *field, struct wpa_ssid *ssid)

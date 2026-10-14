@@ -2029,6 +2029,11 @@ const char * wpa_config_get_global_field_name(unsigned int i, int *no_var);
  */
 struct wpa_config * wpa_config_read(const char *name, struct wpa_config *cfgp,
 				    bool ro, bool show_details);
+#ifdef CONFIG_EMBEDDED_8021X
+struct wpa_config * wpa_config_read_mem(const void *mem, size_t len,
+					struct wpa_config *cfgp);
+#endif
+
 
 /**
  * wpa_config_write - Write or update configuration data

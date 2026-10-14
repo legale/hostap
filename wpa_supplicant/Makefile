@@ -1298,9 +1298,11 @@ override CONFIG_TLS=mbedtls
 endif
 
 ifeq ($(CONFIG_TLS), mbedtls)
+CFLAGS += -I../../mbedtls/include
 ifndef CONFIG_CRYPTO
 CONFIG_CRYPTO=mbedtls
 endif
+
 ifdef TLS_FUNCS
 ifdef CONFIG_TLS_CRYPTOPRO
 OBJS += ../src/crypto/tls_cryptopro.o
@@ -1933,6 +1935,11 @@ endif
 ifdef CONFIG_NO_LINUX_PACKET_SOCKET_WAR
 CFLAGS += -DCONFIG_NO_LINUX_PACKET_SOCKET_WAR
 endif
+
+ifdef CONFIG_EMBEDDED_8021X
+CFLAGS += -DCONFIG_EMBEDDED_8021X
+endif
+
 
 ifdef NEED_BASE64
 OBJS += ../src/utils/base64.o
