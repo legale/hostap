@@ -31,8 +31,9 @@ LDO=$(CC)
 endif
 
 ifndef CFLAGS
-CFLAGS = -MMD -O2 -Wall -g
+CFLAGS = -MMD -O3 -Wall -g
 endif
+
 
 ifneq ($(CONFIG_FILE),)
 -include $(CONFIG_FILE)
