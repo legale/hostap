@@ -2183,9 +2183,9 @@ wpa_supplicant: $(BCHECK) $(OBJS) $(EXTRA_progs)
 	$(Q)$(LDO) $(LDFLAGS) -o wpa_supplicant $(OBJS) $(LIBS) $(EXTRALIBS)
 	@$(E) "  LD " $@
 
-libwpa_supplicant.a: $(BCHECK) $(filter-out $(CONFIG_MAIN).o, $(OBJS))
+libwpa_supplicant.a: $(BCHECK) $(filter-out %/$(CONFIG_MAIN).o $(CONFIG_MAIN).o, $(OBJS))
 	@$(E) "  AR " $@
-	$(Q)$(AR) crs $@ $(filter-out $(CONFIG_MAIN).o, $(OBJS))
+	$(Q)$(AR) crs $@ $(filter-out %/$(CONFIG_MAIN).o $(CONFIG_MAIN).o, $(OBJS))
 
 _OBJS_VAR := OBJS_t
 include ../src/objs.mk
