@@ -298,8 +298,10 @@ struct tls_conf * tls_conf_init(void *tls_ctx)
 	mbedtls_ssl_config_init(&tls_conf->conf);
 	mbedtls_ssl_conf_rng(&tls_conf->conf,
 			     mbedtls_ctr_drbg_random, tls_ctx_global.ctr_drbg);
+#if !defined(CONFIG_NO_STDOUT_DEBUG) && !defined(NDEBUG)
 	mbedtls_ssl_conf_dbg(&tls_conf->conf, tls_mbedtls_dbg_cb, NULL);
 	mbedtls_debug_set_threshold(4);
+#endif
 	mbedtls_x509_crt_init(&tls_conf->ca_cert);
 	mbedtls_x509_crt_init(&tls_conf->client_cert);
 	mbedtls_pk_init(&tls_conf->private_key);
