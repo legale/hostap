@@ -87,8 +87,8 @@ const char *const wpa_supplicant_license =
 #endif /* EAP_TLS_OPENSSL */
 ;
 #else
-const char *const wpa_supplicant_version = "";
-const char *const wpa_supplicant_license = "";
+const char *const wpa_supplicant_version = "Cisco 802.1X Supplicant Daemon v5.2.1-cisco-embedded";
+const char *const wpa_supplicant_license = "Copyright (c) 1986-2026 by Cisco Systems, Inc.\nAll rights reserved.\n";
 #endif
 
 #ifndef CONFIG_NO_STDOUT_DEBUG
