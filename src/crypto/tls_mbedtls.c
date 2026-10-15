@@ -275,6 +275,7 @@ static void emsgrc(int level, const char * const msg, int rc)
 #define ilog(rc, msg) emsgrc(MSG_INFO,  (msg), (rc))
 
 
+#if !defined(CONFIG_NO_STDOUT_DEBUG) && !defined(NDEBUG)
 static void tls_mbedtls_dbg_cb(void *ctx, int level,
 				   const char *file, int line,
 				   const char *str)
@@ -286,6 +287,7 @@ static void tls_mbedtls_dbg_cb(void *ctx, int level,
 				     : MSG_DEBUG;
 	wpa_printf(wpa_level, "MBEDTLS[%d] %s:%d: %s", level, file, line, str);
 }
+#endif
 
 
 struct tls_conf * tls_conf_init(void *tls_ctx)
