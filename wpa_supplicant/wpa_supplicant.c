@@ -73,6 +73,7 @@
 #include "ap/hostapd.h"
 #endif /* CONFIG_MESH */
 
+#ifndef CONFIG_NO_STDOUT_DEBUG
 const char *const wpa_supplicant_version =
 "wpa_supplicant v" VERSION_STR "\n"
 "Copyright (c) 2003-2024, Jouni Malinen <j@w1.fi> and contributors";
@@ -85,6 +86,10 @@ const char *const wpa_supplicant_license =
 "for use in the OpenSSL Toolkit (http://www.openssl.org/)\n"
 #endif /* EAP_TLS_OPENSSL */
 ;
+#else
+const char *const wpa_supplicant_version = "";
+const char *const wpa_supplicant_license = "";
+#endif
 
 #ifndef CONFIG_NO_STDOUT_DEBUG
 /* Long text divided into parts in order to fit in C89 strings size limits. */
@@ -6189,8 +6194,10 @@ static int wpa_supplicant_set_driver(struct wpa_supplicant *wpa_s,
 		return -1;
 
 	if (wpa_drivers[0] == NULL) {
+#ifndef CONFIG_NO_STDOUT_DEBUG
 		wpa_msg(wpa_s, MSG_ERROR, "No driver interfaces build into "
 			"wpa_supplicant");
+#endif
 		return -1;
 	}
 

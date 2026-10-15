@@ -1196,7 +1196,11 @@ int eapol_sm_get_status(struct eapol_sm *sm, char *buf, size_t buflen,
 		return 0;
 
 	len = os_snprintf(buf, buflen,
+#ifndef CONFIG_NO_STDOUT_DEBUG
 			  "Supplicant PAE state=%s\n"
+#else
+			  "PAE state=%s\n"
+#endif
 			  "suppPortStatus=%s\n",
 			  eapol_supp_pae_state(sm->SUPP_PAE_state),
 			  eapol_port_status(sm->suppPortStatus));
@@ -1210,7 +1214,11 @@ int eapol_sm_get_status(struct eapol_sm *sm, char *buf, size_t buflen,
 				  "startPeriod=%u\n"
 				  "maxStart=%u\n"
 				  "portControl=%s\n"
+#ifndef CONFIG_NO_STDOUT_DEBUG
 				  "Supplicant Backend state=%s\n",
+#else
+				  "Backend state=%s\n",
+#endif
 				  sm->heldPeriod,
 				  sm->authPeriod,
 				  sm->startPeriod,
