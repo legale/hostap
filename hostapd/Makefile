@@ -781,6 +781,9 @@ CFLAGS += -DTLS_DEFAULT_CIPHERS=\"$(CONFIG_TLS_DEFAULT_CIPHERS)\"
 endif
 
 ifeq ($(CONFIG_TLS), mbedtls)
+CFLAGS += -I../../mbedtls/include
+LIBS += -L../../mbedtls/library
+LIBS_h += -L../../mbedtls/library
 ifndef CONFIG_CRYPTO
 CONFIG_CRYPTO=mbedtls
 endif
@@ -805,14 +808,18 @@ LIBS += -lmbedcrypto
 LIBS_h += -lmbedcrypto
 LIBS_n += -lmbedcrypto
 LIBS_s += -lmbedcrypto
+CFLAGS += -DCRYPTO_MBEDTLS_CRYPTO_RSA -DCRYPTO_MBEDTLS_CRYPTO_EC -DCRYPTO_MBEDTLS_CRYPTO_BIGNUM
+ifdef CONFIG_POGOST
 LIBS += -lpogost
 LIBS_h += -lpogost
 LIBS_n += -lpogost
 LIBS_s += -lpogost
+endif
 # XXX: create a config option?
 CFLAGS += -DCRYPTO_RSA_OAEP_SHA256
 endif
 endif
+
 
 ifeq ($(CONFIG_TLS), gnutls)
 ifndef CONFIG_CRYPTO
